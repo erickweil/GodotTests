@@ -1,0 +1,66 @@
+// Onde achei estes arquivos:
+// https://godotforums.org/d/31203-vs-code-integration-broken-in-godot-4-b1/5
+// Que linkava para
+// https://github.com/chickensoft-games/GodotGame/blob/main/.vscode/launch.json
+// https://github.com/chickensoft-games/GodotGame/blob/main/.vscode/tasks.json
+{
+	"version": "0.2.0",
+	"configurations": [
+	  // For these launch configurations to work, you need to setup a GODOT4
+	  // environment variable. On mac or linux, this can be done by adding
+	  // the following to your .zshrc, .bashrc, or .bash_profile file:
+	  // export GODOT4="/Applications/Godot.app/Contents/MacOS/Godot"
+	  {
+		"name": "🕹 Debug Game",
+		"type": "coreclr",
+		"request": "launch",
+		"preLaunchTask": "build",
+		"program": "${env:GODOT4}",
+		"args": [],
+		"cwd": "${workspaceFolder}",
+		"stopAtEntry": false,
+	  },
+	  // Debug the scene that matches the name of the currently open *.cs file
+	  // (if there's a scene with the same name in the same directory).
+	  {
+		"name": "🎭 Debug Current Scene",
+		"type": "coreclr",
+		"request": "launch",
+		"preLaunchTask": "build",
+		"program": "${env:GODOT4}",
+		"args": [
+		  "${fileDirname}/${fileBasenameNoExtension}.tscn"
+		],
+		"cwd": "${workspaceFolder}",
+		"stopAtEntry": false,
+	  },
+	  {
+		"name": "🧪 Debug Tests",
+		"type": "coreclr",
+		"request": "launch",
+		"preLaunchTask": "build",
+		"program": "${env:GODOT4}",
+		"args": [
+		  // These command line flags are used by GoDotTest to run tests.
+		  "--run-tests",
+		  "--quit-on-finish"
+		],
+		"cwd": "${workspaceFolder}",
+		"stopAtEntry": false,
+	  },
+	  {
+		"name": "🔬 Debug Current Test",
+		"type": "coreclr",
+		"request": "launch",
+		"preLaunchTask": "build",
+		"program": "${env:GODOT4}",
+		"args": [
+		  // These command line flags are used by GoDotTest to run tests.
+		  "--run-tests=${fileBasenameNoExtension}",
+		  "--quit-on-finish"
+		],
+		"cwd": "${workspaceFolder}",
+		"stopAtEntry": false,
+	  },
+	]
+  }
