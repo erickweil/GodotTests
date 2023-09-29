@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://rg4igarm6dsv"]
 
-[ext_resource type="Script" path="res://RenderingPipeline/Demo.cs" id="1_v71mq"]
+[ext_resource type="Script" path="res://RenderingPipeline/ComputePipeline.cs" id="1_ygays"]
 
 [node name="ColorRect" type="ColorRect"]
 anchors_preset = 15
@@ -25,4 +25,4 @@ handle_input_locally = false
 size = Vector2i(1152, 648)
 render_target_clear_mode = 1
 render_target_update_mode = 4
-script = ExtResource("1_v71mq")
+script = ExtResource("1_ygays")

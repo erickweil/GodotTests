@@ -15,18 +15,22 @@ public class ComputeShaderHandler : IDisposable {
 	Rid uniformSet;
 	Rid pipeline;
 
-	public ComputeShaderHandler(bool local) {
+	public ComputeShaderHandler(bool local, RenderingDevice rd = null) {
 		isLocalRenderingDevice = local;
-		if(isLocalRenderingDevice) {
-			rd = RenderingServer.CreateLocalRenderingDevice();
+		if(rd == null) {
+			if(isLocalRenderingDevice) {
+				this.rd = RenderingServer.CreateLocalRenderingDevice();
+			} else {
+				// Ver depois questões de multithreading que pode dar problema
+				// """ 
+				// 		For clarity, this is only needed for compute code that needs to synchronize with the main RenderingDevice. 
+				//		Compute code running on a local rendering device can be managed from any thread
+				// """
+				//  Add ability to call code on rendering thread #79696 https://github.com/godotengine/godot/pull/79696
+				this.rd = RenderingServer.GetRenderingDevice();
+			}
 		} else {
-			// Ver depois questões de multithreading que pode dar problema
-			// """ 
-			// 		For clarity, this is only needed for compute code that needs to synchronize with the main RenderingDevice. 
-			//		Compute code running on a local rendering device can be managed from any thread
-			// """
-			//  Add ability to call code on rendering thread #79696 https://github.com/godotengine/godot/pull/79696
-			rd = RenderingServer.GetRenderingDevice();
+			this.rd = rd;
 		}
 
 		uniformList = new Godot.Collections.Array<RDUniform>();
