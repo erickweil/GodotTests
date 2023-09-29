@@ -17,22 +17,20 @@ using System;
  - Raytracing https://github.com/nekotogd/Raytracing_Godot4/tree/master
  - Life Compute in Godot https://github.com/snailrhymer/Compute-Life
 */
-public partial class Main : Node3D
-{
+public partial class Main : Node3D {
 	// Called when the node enters the scene tree for the first time.
 	ComputeShaderHandler computeHandler;
 	int width, height;
 	float[] input;
 	Rid input_buffer;
-	public override void _Ready()
-	{
+	public override void _Ready() {
 		initializeCompute();
 	}
 
 	// https://github.com/godotengine/godot/pull/79696
 	public void initializeCompute() {
 		computeHandler = new ComputeShaderHandler(false);
-		computeHandler.loadShader("res://assets/shaders/compute_example.glsl",8,8,1);
+		computeHandler.loadShader("res://HelloComputeShader/compute_example.glsl",8,8,1);
 
 		// Prepare our data. We use floats in the shader, so we need 32 bit.
 		width = 128;
@@ -50,8 +48,7 @@ public partial class Main : Node3D
 
 	// Called every frame. 'delta' is the elapsed time since the previous frame.
 	//public override void _Process(double delta)
-	public override void _Process(double delta)
-	{
+	public override void _Process(double delta)	{
 		if(Input.IsActionJustPressed("ui_up")) {
 			testar();
 		}

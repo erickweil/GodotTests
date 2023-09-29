@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://brnch55vckgi4"]
 
-[ext_resource type="Script" path="res://src/Main.cs" id="1_wyufs"]
+[ext_resource type="Script" path="res://HelloComputeShader/Main.cs" id="1_wyufs"]
 
 [node name="Node3D" type="Node3D"]
 script = ExtResource("1_wyufs")

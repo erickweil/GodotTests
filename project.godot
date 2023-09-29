@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="GodotTests"
-run/main_scene="res://assets/scenes/main_scene.tscn"
+run/main_scene="res://RenderingPipeline/rendering_pipeline.tscn"
 config/features=PackedStringArray("4.1", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 
