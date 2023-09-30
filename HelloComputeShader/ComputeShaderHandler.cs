@@ -2,9 +2,10 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 
 public class ComputeShaderHandler : IDisposable {
-	private RenderingDevice rd;
+	public RenderingDevice rd;
 	private bool isLocalRenderingDevice;
 	List<Rid> createdRids;
 	Rid shader;
@@ -12,7 +13,7 @@ public class ComputeShaderHandler : IDisposable {
 
 	Godot.Collections.Array<RDUniform> uniformList;
 
-	Rid uniformSet;
+	public Rid uniformSet;
 	Rid pipeline;
 
 	public ComputeShaderHandler(bool local, RenderingDevice rd = null) {
@@ -108,6 +109,30 @@ public class ComputeShaderHandler : IDisposable {
 		//return uniformSet;
 	}
 
+	public void resetUniforms() {
+		//for(int i = uniformList.Count-1; i >= 0; i--) {
+			//Rid rid = uniformList[i]._Ids[0];
+			//createdRids.Remove(rid);
+			//rd.FreeRid(rid);
+		//}
+		//uniformList.Clear();
+
+		uniformList = new Godot.Collections.Array<RDUniform>();
+	}
+
+	// https://github.com/godotengine/godot-demo-projects/tree/65b34f81920752a382d14d544aa451de46b32a07/misc/compute_shader_heightmap
+	public Rid createNewRDTexture(int widht, int height) {
+		var textureFormat = new RDTextureFormat();
+		textureFormat.Format = RenderingDevice.DataFormat.R8G8B8A8Unorm;
+		textureFormat.Width = (uint)widht;
+		textureFormat.Height = (uint)height;
+		textureFormat.UsageBits = RenderingDevice.TextureUsageBits.StorageBit | RenderingDevice.TextureUsageBits.CanUpdateBit | RenderingDevice.TextureUsageBits.CanCopyFromBit;
+
+		var textureRid = rd.TextureCreate(textureFormat,new RDTextureView());
+		createdRids.Add(textureRid);
+		return textureRid;
+	}
+
 	/* Defining a compute pipeline
 	The next step is to create a set of instructions our GPU can execute. We need a pipeline and a compute list for that.
 	The steps we need to do to compute our result are:
@@ -125,12 +150,14 @@ public class ComputeShaderHandler : IDisposable {
 	you may access memory outside of your shaders control or parts of other variables which may cause issues on some hardware.
 	*/
 	public void createPipeline() {
-		uniformSet = rd.UniformSetCreate(uniformList, shader, 0);
-		createdRids.Add(uniformSet);
-
 		// Create a compute pipeline
 		pipeline = rd.ComputePipelineCreate(shader);
 		createdRids.Add(pipeline);
+	}
+
+	public void createUniformSet() {
+		uniformSet = rd.UniformSetCreate(uniformList, shader, 0);
+		createdRids.Add(uniformSet);
 	}
 
 	public void dipatchPipeline(uint xInvocations, uint yInvocations, uint zInvocations) {
@@ -194,6 +221,42 @@ public class ComputeShaderHandler : IDisposable {
 		createdRids.Add(buffer);
 
 		return buffer;
+	}
+
+	public Rid createBufferFromBytes(byte[] inputBytes) {
+		// Create a storage buffer that can hold our float values.
+		// Each float has 4 bytes (32 bit) so 10 x 4 = 40 bytes
+		var buffer = rd.StorageBufferCreate((uint)inputBytes.Length, inputBytes);
+		createdRids.Add(buffer);
+
+		return buffer;
+	}
+
+	public void updateBufferFromBytes(Rid buffer, byte[] inputBytes) {
+		rd.BufferUpdate(buffer,0,(uint)inputBytes.Length,inputBytes);
+	}
+
+	// https://stackoverflow.com/questions/3278827/how-to-convert-a-structure-to-a-byte-array-in-c
+	public static byte[] GetBytesFromStruct<T>(T str)
+	{
+		int size = Marshal.SizeOf(str);
+		byte[] arr = new byte[size];
+		GCHandle h = default(GCHandle);
+		try
+		{
+			h = GCHandle.Alloc(arr, GCHandleType.Pinned);
+
+			Marshal.StructureToPtr<T>(str, h.AddrOfPinnedObject(), false);
+		}
+		finally
+		{
+			if (h.IsAllocated)
+			{
+				h.Free();
+			}
+		}
+
+		return arr;
 	}
 
 	public float[] readFloatBuffer(Rid buffer) {

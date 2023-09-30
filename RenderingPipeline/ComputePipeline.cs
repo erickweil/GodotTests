@@ -38,21 +38,24 @@ public partial class ComputePipeline : SubViewport {
 
         // https://paroj.github.io/gltut/Basics/Tut02%20Vertex%20Attributes.html
 
-        uint nVertices = 3;
+        uint nVertices = 6;
         var vertices = new float[] {
             // Vertices
-             0.0f, -0.5f, 0.0f, 
-             0.5f,  0.5f, 1.0f, 
-            -0.5f,  0.5f, 0.0f
+             -1.0f, -1.0f, 0.0f, 
+             -1.0f,  1.0f, 0.0f, 
+              1.0f, -1.0f, 0.0f,
+              1.0f, -1.0f, 0.0f, 
+             -1.0f,  1.0f, 0.0f, 
+              1.0f,  1.0f, 0.0f
         };
         var colors = new float[] {
             // Colors
-            1.0f, 0.0f, 0.0f, 1.0f,
-            0.0f, 1.0f, 0.0f, 1.0f,
             0.0f, 0.0f, 1.0f, 1.0f,
-            0.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 0.0f, 0.0f,
+            1.0f, 0.0f, 1.0f, 1.0f,
+            0.0f, 1.0f, 1.0f, 1.0f,
+            1.0f, 1.0f, 0.0f, 1.0f,
+            0.0f, 1.0f, 0.0f, 1.0f,
+            0.0f, 1.0f, 1.0f, 1.0f,
             0.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 0.0f, 0.0f
         };
@@ -118,7 +121,7 @@ public partial class ComputePipeline : SubViewport {
     {
         if(!Input.IsActionJustPressed("ui_up")) return;
 
-        computeHandler.dipatchPipeline(8,1,1);
+        //computeHandler.dipatchPipeline(8,1,1);
         // handle resizing
         if(!RD.FramebufferIsValid(framebuffer)) {
             createFrameBuffer();
