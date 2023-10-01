@@ -12,18 +12,19 @@ public partial class ConwayGameOfLife : SubViewport {
     RenderingDevice RD;
     ComputeShaderHandler computeHandler;
     struct UniformBuffer {
+        public uint width;
+	    public uint height;
         public uint mousex;
 	    public uint mousey;
-        public uint pad0;
-        public uint pad1;
-        public UniformBuffer(uint mousex, uint mousey)
+        public UniformBuffer(uint width, uint height,uint mousex, uint mousey)
         {
+            this.width = width;
+            this.height = height;
+
             this.mousex = mousex;
             this.mousey = mousey;
 
             // tem que ser múltiplo de 16 bytes
-            pad0 = 0;
-            pad1 = 0;
         }
     }
 
@@ -32,11 +33,13 @@ public partial class ConwayGameOfLife : SubViewport {
         computeHandler = new ComputeShaderHandler(false,RD);
 		computeHandler.loadShader("res://ConwayGameOfLife/compute_game_of_life.glsl",8,8,1);
 
-        uniformBuffer_data = new UniformBuffer(0, 0);
+        ViewportTexture tex = GetTexture();
+
+        uniformBuffer_data = new UniformBuffer((uint)tex.GetWidth(), (uint)tex.GetHeight(), 0, 0);
 
         computeHandler.pushConstant = ComputeShaderHandler.GetBytesFromStruct(uniformBuffer_data);
 
-        createUniforms(GetTexture());
+        createUniforms(tex);
 
         
 		// Defining a compute pipeline
@@ -64,7 +67,10 @@ public partial class ConwayGameOfLife : SubViewport {
 
         if(!RD.UniformSetIsValid(computeHandler.uniformSets[0].rid)) {
             GD.Print("Re-doing uniform set");
+
             computeHandler.resetUniformSets();
+
+            RD.FreeRid(computeTex);
 
             createUniforms(tex);
 
@@ -74,13 +80,22 @@ public partial class ConwayGameOfLife : SubViewport {
         Vector2 pos = GetMousePosition();
 
         //GD.Print(pos);
+        uniformBuffer_data.width = width;
+        uniformBuffer_data.height = height;
         uniformBuffer_data.mousex = (uint)Math.Clamp((int)pos.X,0,(int)width);
-        uniformBuffer_data.mousey = (uint)Math.Clamp((int)pos.Y,0,(int)width);
+        uniformBuffer_data.mousey = (uint)Math.Clamp((int)pos.Y,0,(int)height);
         computeHandler.pushConstant = ComputeShaderHandler.GetBytesFromStruct(uniformBuffer_data);
 
-        computeHandler.dipatchPipeline(width+8,height+8,1);
+        //for(int i = 0; i < 10; i++) {
+            computeHandler.dipatchPipeline(width+8,height+8,1);
 
-        RD.TextureCopy(vptex,computeTex,Vector3.Zero,Vector3.Zero,new Vector3(width,height,0),0,0,0,0);
+            // If you want the output of a compute shader to be used as input of
+            // another computer shader you'll need to add a barrier:
+            // NOT DOING ANY DIFFERENCE BUT LEAVING HERE IF SOMETHING WEIRD HAPPENS
+            //RD.Barrier(RenderingDevice.BarrierMask.Compute);
+
+            RD.TextureCopy(vptex,computeTex,Vector3.Zero,Vector3.Zero,new Vector3(width,height,0),0,0,0,0);
+        //}
 
         //GD.Print( (Time.GetTicksUsec() - startTime) / 1000.0, "ms");
     }
@@ -90,5 +105,6 @@ public partial class ConwayGameOfLife : SubViewport {
     {
         base._ExitTree();
         computeHandler.Dispose();
+        RD.FreeRid(computeTex);
     }
 }

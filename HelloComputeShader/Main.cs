@@ -36,7 +36,7 @@ public partial class Main : Node3D {
 		width = 128;
 		height = 128;
 		input = new float[width * height];
-		input_buffer = ComputeShaderHandler.createFloatBuffer(computeHandler.rd,input);
+		input_buffer = ComputeShaderHandler.createArrayBuffer(computeHandler.RD,input,sizeof(float));
 
 		computeHandler.putBufferUniform(input_buffer, 0, 0, RenderingDevice.UniformType.StorageBuffer);
 

@@ -21,7 +21,7 @@ public class ComputeShaderHandler : IDisposable {
 			rid = rd.UniformSetCreate(uniformList, shader, shaderSet);
 		}
 	}
-	public RenderingDevice rd;
+	public RenderingDevice RD;
 	private bool isLocalRenderingDevice;
 	public List<UniformSet> uniformSets;
 
@@ -34,7 +34,7 @@ public class ComputeShaderHandler : IDisposable {
 		isLocalRenderingDevice = local;
 		if(rd == null) {
 			if(isLocalRenderingDevice) {
-				this.rd = RenderingServer.CreateLocalRenderingDevice();
+				this.RD = RenderingServer.CreateLocalRenderingDevice();
 			} else {
 				// Ver depois questões de multithreading que pode dar problema
 				// """ 
@@ -42,10 +42,10 @@ public class ComputeShaderHandler : IDisposable {
 				//		Compute code running on a local rendering device can be managed from any thread
 				// """
 				//  Add ability to call code on rendering thread #79696 https://github.com/godotengine/godot/pull/79696
-				this.rd = RenderingServer.GetRenderingDevice();
+				this.RD = RenderingServer.GetRenderingDevice();
 			}
 		} else {
-			this.rd = rd;
+			this.RD = rd;
 		}
 
 		uniformSets = new List<UniformSet>();
@@ -72,7 +72,7 @@ public class ComputeShaderHandler : IDisposable {
 			throw new InvalidDataException("Não foi possível compilar o shader:"+shaderSpirV.CompileErrorCompute);
 		}
 
-		shader = rd.ShaderCreateFromSpirV(shaderSpirV);
+		shader = RD.ShaderCreateFromSpirV(shaderSpirV);
 	}
 
 	/*
@@ -125,8 +125,8 @@ public class ComputeShaderHandler : IDisposable {
 
 	public void resetUniformSets() {
 		for(int i=0;i<uniformSets.Count;i++) {
-			if(rd.UniformSetIsValid(uniformSets[i].rid))
-			rd.FreeRid(uniformSets[i].rid);
+			if(RD.UniformSetIsValid(uniformSets[i].rid))
+			RD.FreeRid(uniformSets[i].rid);
 		}
 
 		uniformSets = new List<UniformSet>();
@@ -150,19 +150,19 @@ public class ComputeShaderHandler : IDisposable {
 	*/
 	public void createPipeline() {
 		// Create a compute pipeline
-		pipeline = rd.ComputePipelineCreate(shader);
+		pipeline = RD.ComputePipelineCreate(shader);
 
 		for(int i=0;i<uniformSets.Count;i++) {
-			uniformSets[i].create(rd,shader,(uint)i);
+			uniformSets[i].create(RD,shader,(uint)i);
 		}
 	}
 
 	public void createUniformSet(int set) {
-		uniformSets[set].create(rd,shader,(uint)set);
+		uniformSets[set].create(RD,shader,(uint)set);
 	}
 
 	public void dipatchPipeline(uint xInvocations, uint yInvocations, uint zInvocations) {
-		if(rd.ComputePipelineIsValid(pipeline) == false) {
+		if(RD.ComputePipelineIsValid(pipeline) == false) {
 			throw new InvalidDataException("Pipeline inválido");
 		}
 		// Deveria dar erro caso a conta não bater?
@@ -170,22 +170,22 @@ public class ComputeShaderHandler : IDisposable {
 		uint yGroups = yInvocations / local_size_y;
 		uint zGroups = zInvocations / local_size_z;
 
-		var computeList = rd.ComputeListBegin();
+		var computeList = RD.ComputeListBegin();
 		// Se quiser pode repetir o dispatch
-			rd.ComputeListBindComputePipeline(computeList, pipeline);
+			RD.ComputeListBindComputePipeline(computeList, pipeline);
 			for(int i = 0;i < uniformSets.Count; i++)
 			{
-				if(rd.UniformSetIsValid(uniformSets[i].rid) == false)
+				if(RD.UniformSetIsValid(uniformSets[i].rid) == false)
 				throw new InvalidDataException("UniformSet inválido");
 
-				rd.ComputeListBindUniformSet(computeList, uniformSets[i].rid, (uint)i);
+				RD.ComputeListBindUniformSet(computeList, uniformSets[i].rid, (uint)i);
 			}
 			
 			if(pushConstant != null)
-			rd.ComputeListSetPushConstant(computeList,pushConstant,(uint)pushConstant.Length);
+			RD.ComputeListSetPushConstant(computeList,pushConstant,(uint)pushConstant.Length);
 
-			rd.ComputeListDispatch(computeList, xGroups: xGroups, yGroups: yGroups, zGroups: zGroups);
-		rd.ComputeListEnd();
+			RD.ComputeListDispatch(computeList, xGroups: xGroups, yGroups: yGroups, zGroups: zGroups);
+		RD.ComputeListEnd();
 	}
 
 	public void submitAndSyncPipeline(uint xInvocations, uint yInvocations, uint zInvocations) {
@@ -199,8 +199,8 @@ public class ComputeShaderHandler : IDisposable {
 			for reading right away. In general, you will want to wait at least 2 or 3 frames before synchronizing so that 
 			the GPU is able to run in parallel with the CPU.
 			*/
-			rd.Submit();
-			rd.Sync();
+			RD.Submit();
+			RD.Sync();
 		}
 	}
 
@@ -208,11 +208,11 @@ public class ComputeShaderHandler : IDisposable {
     {
 		GD.Print("Dispose ComputeShaderHandler");
 		for(int i = 0;i < uniformSets.Count; i++) {
-			if(rd.UniformSetIsValid(uniformSets[i].rid))
-			rd.FreeRid(uniformSets[i].rid);
+			if(RD.UniformSetIsValid(uniformSets[i].rid))
+			RD.FreeRid(uniformSets[i].rid);
 		}
-		rd.FreeRid(pipeline);
-		rd.FreeRid(shader);
+		RD.FreeRid(pipeline);
+		RD.FreeRid(shader);
     }
 
 	// =====================================================
@@ -230,9 +230,26 @@ public class ComputeShaderHandler : IDisposable {
 		return textureRid;
 	}
 
-	public static Rid createFloatBuffer(RenderingDevice rd,float[] input) {
-		var inputBytes = new byte[input.Length * sizeof(float)];
+	public static Rid createArrayBuffer<T>(RenderingDevice rd,T[] input, int elementSize) {
+		var inputBytes = new byte[input.Length * elementSize];
 		Buffer.BlockCopy(input, 0, inputBytes, 0, inputBytes.Length);
+
+		// Create a storage buffer that can hold our float values.
+		// Each float has 4 bytes (32 bit) so 10 x 4 = 40 bytes
+		var buffer = rd.StorageBufferCreate((uint)inputBytes.Length, inputBytes);
+
+		return buffer;
+	}
+
+	public static Rid createStructArrayBuffer<T>(RenderingDevice rd,T[] input, int elementSize) {
+		var inputBytes = new byte[input.Length * elementSize];
+		
+		// Não funciona BlockCopy https://stackoverflow.com/questions/33181945/blockcopy-a-class-getting-object-must-be-an-array-of-primitives
+		for(int i = 0;i< input.Length;i++) {
+			byte[] elemBytes = GetBytesFromStruct(input[i]);
+
+			Buffer.BlockCopy(elemBytes, 0, inputBytes, i * elementSize, elemBytes.Length);
+		}
 
 		// Create a storage buffer that can hold our float values.
 		// Each float has 4 bytes (32 bit) so 10 x 4 = 40 bytes
@@ -277,10 +294,35 @@ public class ComputeShaderHandler : IDisposable {
 	}
 
 	public float[] readFloatBuffer(Rid buffer) {
-		var outputBytes = rd.BufferGetData(buffer);
+		var outputBytes = RD.BufferGetData(buffer);
 		var output = new float[outputBytes.Length / sizeof(float)];
 		Buffer.BlockCopy(outputBytes, 0, output, 0, outputBytes.Length);
 
 		return output;
 	}
+
+	public void readArrayBuffer<T>(Rid buffer,T[] output) {
+		var outputBytes = RD.BufferGetData(buffer);
+		//var output = new float[outputBytes.Length / sizeof(float)];
+		Buffer.BlockCopy(outputBytes, 0, output, 0, outputBytes.Length);
+	}
+
+	public void readStructArrayBuffer<T>(Rid buffer,T[] output) where T : struct {
+		byte[] outputBytes = RD.BufferGetData(buffer);
+		ReadOnlySpan<T> span = MemoryMarshal.Cast<byte,T>(outputBytes);
+		for(int i = 0;i< output.Length;i++) {
+			output[i] = span[i];
+		}
+	}
+
+	/*public void readStructArrayBuffer<T>(Rid buffer,T[] output) {
+		var outputBytes = RD.BufferGetData(buffer);
+		// https://gist.github.com/13xforever/2835844
+		var pData = GCHandle.Alloc(outputBytes, GCHandleType.Pinned);
+		for(int i = 0;i< output.Length;i++) {
+			var result = (T)Marshal.PtrToStructure(pData.AddrOfPinnedObject(), typeof(T));
+		}
+		pData.Free();
+		return result;
+	}*/
 }

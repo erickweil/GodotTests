@@ -73,9 +73,16 @@ layout(rgba8, set = 0, binding = 1) uniform restrict writeonly image2D _grid_cur
 
 // Our push PushConstant
 layout(push_constant, std430) uniform Params {
+	uint width;
+	uint height;
 	uint mousex;
 	uint mousey;
 } _params;
+
+ivec2 coord(uint x, uint y) {
+	return ivec2((x+1) % _params.width,
+				(y+1) % _params.height);
+}
 
 // The code we want to execute in each invocation
 void main() {
@@ -83,22 +90,23 @@ void main() {
 	// https://registry.khronos.org/OpenGL-Refpages/gl4/html/gl_GlobalInvocationID.xhtml
     uvec3 id = gl_GlobalInvocationID;
 	
+	if(id.x >= _params.width || id.y >= _params.height) return;
 	// Store the pixel back into the image.
 	// WARNING: make sure you are writing to the same coordinate that you read from.
 	// If you don't, you may end up writing to a pixel, before that pixel is read
 	// by a different invocation and cause errors.
 	float neighCount = 0;
-	neighCount += imageLoad(_grid_previous, ivec2(id.x-1,id.y-1)).r;
-	neighCount += imageLoad(_grid_previous, ivec2(id.x-1,id.y)).r;
-	neighCount += imageLoad(_grid_previous, ivec2(id.x-1,id.y+1)).r;
+	neighCount += imageLoad(_grid_previous, coord(id.x-1,id.y-1)).r;
+	neighCount += imageLoad(_grid_previous, coord(id.x-1,id.y)).r;
+	neighCount += imageLoad(_grid_previous, coord(id.x-1,id.y+1)).r;
 
-	neighCount += imageLoad(_grid_previous, ivec2(id.x,id.y-1)).r;
-	float cell = imageLoad(_grid_previous, ivec2(id.x,id.y)).r;
-	neighCount += imageLoad(_grid_previous, ivec2(id.x,id.y+1)).r;
+	neighCount += imageLoad(_grid_previous, coord(id.x,id.y-1)).r;
+	float cell = imageLoad(_grid_previous, coord(id.x,id.y)).r;
+	neighCount += imageLoad(_grid_previous, coord(id.x,id.y+1)).r;
 
-	neighCount += imageLoad(_grid_previous, ivec2(id.x+1,id.y-1)).r;
-	neighCount += imageLoad(_grid_previous, ivec2(id.x+1,id.y)).r;
-	neighCount += imageLoad(_grid_previous, ivec2(id.x+1,id.y+1)).r;
+	neighCount += imageLoad(_grid_previous, coord(id.x+1,id.y-1)).r;
+	neighCount += imageLoad(_grid_previous, coord(id.x+1,id.y)).r;
+	neighCount += imageLoad(_grid_previous, coord(id.x+1,id.y+1)).r;
 	
 	//  mais que 3 (4,5,6,7,8,9) morre
 	//  ou menos que 2 (1,0) morre
@@ -111,11 +119,11 @@ void main() {
 
 	// mouse
 	//if(id.x >= _params.mousex -5 && id.x <= _params.mousex + 5 && id.y >= _params.mousey -5 && id.y <= _params.mousey + 5) {
-	if(id.y == _params.mousey) {
+	if(id.x + id.y == _params.mousex) {
 		cell = 1.0;
 	}
 
 	vec4 newpixel = vec4(cell,cell,cell,1.0);
 
-	imageStore(_grid_current, ivec2(id.x,id.y), newpixel);
+	imageStore(_grid_current, coord(id.x,id.y), newpixel);
 }

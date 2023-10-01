@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://chvcgeqihs4nn"
+path="res://.godot/imported/billboard_shader.glsl-90bec624ca0c806de052547b8d1882cb.res"
+
+[deps]
+
+source_file="res://GravitySimulation/billboard_shader.glsl"
+dest_files=["res://.godot/imported/billboard_shader.glsl-90bec624ca0c806de052547b8d1882cb.res"]
+
+[params]
+
