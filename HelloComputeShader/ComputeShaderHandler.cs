@@ -5,18 +5,32 @@ using System.IO;
 using System.Runtime.InteropServices;
 
 public class ComputeShaderHandler : IDisposable {
+	public class UniformSet {
+		Godot.Collections.Array<RDUniform> uniformList;
+		public Rid rid;
+
+		public UniformSet() {
+			uniformList = new Godot.Collections.Array<RDUniform>();
+		}
+
+		public void addUniform(RDUniform uniform) {
+			uniformList.Add(uniform);
+		}
+
+		public void create(RenderingDevice rd, Rid shader, uint shaderSet) {
+			rid = rd.UniformSetCreate(uniformList, shader, shaderSet);
+		}
+	}
 	public RenderingDevice rd;
 	private bool isLocalRenderingDevice;
-	List<Rid> createdRids;
+	public List<UniformSet> uniformSets;
+
 	Rid shader;
 	uint local_size_x, local_size_y, local_size_z;
-
-	Godot.Collections.Array<RDUniform> uniformList;
-
-	public Rid uniformSet;
 	Rid pipeline;
+    public byte[] pushConstant;
 
-	public ComputeShaderHandler(bool local, RenderingDevice rd = null) {
+    public ComputeShaderHandler(bool local, RenderingDevice rd = null) {
 		isLocalRenderingDevice = local;
 		if(rd == null) {
 			if(isLocalRenderingDevice) {
@@ -34,8 +48,7 @@ public class ComputeShaderHandler : IDisposable {
 			this.rd = rd;
 		}
 
-		uniformList = new Godot.Collections.Array<RDUniform>();
-		createdRids = new List<Rid>();
+		uniformSets = new List<UniformSet>();
 	}
 
 	/*
@@ -60,7 +73,6 @@ public class ComputeShaderHandler : IDisposable {
 		}
 
 		shader = rd.ShaderCreateFromSpirV(shaderSpirV);
-		createdRids.Add(shader);
 	}
 
 	/*
@@ -93,7 +105,7 @@ public class ComputeShaderHandler : IDisposable {
 		UniformType UNIFORM_TYPE_MAX = 10
 				Represents the size of the UniformType enum.
 	*/
-	public void addBufferUniform(Rid buffer, int binding, 
+	public void putBufferUniform(Rid buffer, int set, int binding, 
 	RenderingDevice.UniformType uniformType = RenderingDevice.UniformType.StorageBuffer) {
 		// Create a uniform to assign the buffer to the rendering device
 		var uniform = new RDUniform
@@ -103,34 +115,21 @@ public class ComputeShaderHandler : IDisposable {
 		};
 		uniform.AddId(buffer);
 
-		uniformList.Add(uniform);
+		if(uniformSets.Count == set) {
+			uniformSets.Add(new UniformSet());
+		}
+		UniformSet uniformSet = uniformSets[set];
 
-		//var uniformSet = rd.UniformSetCreate(new Godot.Collections.Array<RDUniform> { uniform }, shader, set);
-		//return uniformSet;
+		uniformSet.addUniform(uniform);
 	}
 
-	public void resetUniforms() {
-		//for(int i = uniformList.Count-1; i >= 0; i--) {
-			//Rid rid = uniformList[i]._Ids[0];
-			//createdRids.Remove(rid);
-			//rd.FreeRid(rid);
-		//}
-		//uniformList.Clear();
+	public void resetUniformSets() {
+		for(int i=0;i<uniformSets.Count;i++) {
+			if(rd.UniformSetIsValid(uniformSets[i].rid))
+			rd.FreeRid(uniformSets[i].rid);
+		}
 
-		uniformList = new Godot.Collections.Array<RDUniform>();
-	}
-
-	// https://github.com/godotengine/godot-demo-projects/tree/65b34f81920752a382d14d544aa451de46b32a07/misc/compute_shader_heightmap
-	public Rid createNewRDTexture(int widht, int height) {
-		var textureFormat = new RDTextureFormat();
-		textureFormat.Format = RenderingDevice.DataFormat.R8G8B8A8Unorm;
-		textureFormat.Width = (uint)widht;
-		textureFormat.Height = (uint)height;
-		textureFormat.UsageBits = RenderingDevice.TextureUsageBits.StorageBit | RenderingDevice.TextureUsageBits.CanUpdateBit | RenderingDevice.TextureUsageBits.CanCopyFromBit;
-
-		var textureRid = rd.TextureCreate(textureFormat,new RDTextureView());
-		createdRids.Add(textureRid);
-		return textureRid;
+		uniformSets = new List<UniformSet>();
 	}
 
 	/* Defining a compute pipeline
@@ -152,18 +151,17 @@ public class ComputeShaderHandler : IDisposable {
 	public void createPipeline() {
 		// Create a compute pipeline
 		pipeline = rd.ComputePipelineCreate(shader);
-		createdRids.Add(pipeline);
+
+		for(int i=0;i<uniformSets.Count;i++) {
+			uniformSets[i].create(rd,shader,(uint)i);
+		}
 	}
 
-	public void createUniformSet() {
-		uniformSet = rd.UniformSetCreate(uniformList, shader, 0);
-		createdRids.Add(uniformSet);
+	public void createUniformSet(int set) {
+		uniformSets[set].create(rd,shader,(uint)set);
 	}
 
 	public void dipatchPipeline(uint xInvocations, uint yInvocations, uint zInvocations) {
-		if(rd.UniformSetIsValid(uniformSet) == false) {
-			throw new InvalidDataException("UniformSet inválido");
-		}
 		if(rd.ComputePipelineIsValid(pipeline) == false) {
 			throw new InvalidDataException("Pipeline inválido");
 		}
@@ -175,7 +173,17 @@ public class ComputeShaderHandler : IDisposable {
 		var computeList = rd.ComputeListBegin();
 		// Se quiser pode repetir o dispatch
 			rd.ComputeListBindComputePipeline(computeList, pipeline);
-			rd.ComputeListBindUniformSet(computeList, uniformSet, 0);
+			for(int i = 0;i < uniformSets.Count; i++)
+			{
+				if(rd.UniformSetIsValid(uniformSets[i].rid) == false)
+				throw new InvalidDataException("UniformSet inválido");
+
+				rd.ComputeListBindUniformSet(computeList, uniformSets[i].rid, (uint)i);
+			}
+			
+			if(pushConstant != null)
+			rd.ComputeListSetPushConstant(computeList,pushConstant,(uint)pushConstant.Length);
+
 			rd.ComputeListDispatch(computeList, xGroups: xGroups, yGroups: yGroups, zGroups: zGroups);
 		rd.ComputeListEnd();
 	}
@@ -199,40 +207,49 @@ public class ComputeShaderHandler : IDisposable {
     public void Dispose()
     {
 		GD.Print("Dispose ComputeShaderHandler");
-		for(int i = createdRids.Count-1; i >= 0; i--) {
-			rd.FreeRid(createdRids[i]);
+		for(int i = 0;i < uniformSets.Count; i++) {
+			if(rd.UniformSetIsValid(uniformSets[i].rid))
+			rd.FreeRid(uniformSets[i].rid);
 		}
-		createdRids.Clear();
-		createdRids = null;
-        //rd.Dispose();
-		//rd = null;
+		rd.FreeRid(pipeline);
+		rd.FreeRid(shader);
     }
 
 	// =====================================================
 	// Helpers
 	// =====================================================
-	public Rid createFloatBuffer(float[] input) {
+	// https://github.com/godotengine/godot-demo-projects/tree/65b34f81920752a382d14d544aa451de46b32a07/misc/compute_shader_heightmap
+	public static Rid createNewRDTexture(RenderingDevice rd,int widht, int height, RenderingDevice.DataFormat format = RenderingDevice.DataFormat.R8G8B8A8Unorm) {
+		var textureFormat = new RDTextureFormat();
+		textureFormat.Format = format;
+		textureFormat.Width = (uint)widht;
+		textureFormat.Height = (uint)height;
+		textureFormat.UsageBits = RenderingDevice.TextureUsageBits.StorageBit | RenderingDevice.TextureUsageBits.CanUpdateBit | RenderingDevice.TextureUsageBits.CanCopyToBit;
+
+		var textureRid = rd.TextureCreate(textureFormat,new RDTextureView());
+		return textureRid;
+	}
+
+	public static Rid createFloatBuffer(RenderingDevice rd,float[] input) {
 		var inputBytes = new byte[input.Length * sizeof(float)];
 		Buffer.BlockCopy(input, 0, inputBytes, 0, inputBytes.Length);
 
 		// Create a storage buffer that can hold our float values.
 		// Each float has 4 bytes (32 bit) so 10 x 4 = 40 bytes
 		var buffer = rd.StorageBufferCreate((uint)inputBytes.Length, inputBytes);
-		createdRids.Add(buffer);
 
 		return buffer;
 	}
 
-	public Rid createBufferFromBytes(byte[] inputBytes) {
+	public static Rid createBufferFromBytes(RenderingDevice rd,byte[] inputBytes) {
 		// Create a storage buffer that can hold our float values.
 		// Each float has 4 bytes (32 bit) so 10 x 4 = 40 bytes
 		var buffer = rd.StorageBufferCreate((uint)inputBytes.Length, inputBytes);
-		createdRids.Add(buffer);
 
 		return buffer;
 	}
 
-	public void updateBufferFromBytes(Rid buffer, byte[] inputBytes) {
+	public static void updateBufferFromBytes(RenderingDevice rd, Rid buffer, byte[] inputBytes) {
 		rd.BufferUpdate(buffer,0,(uint)inputBytes.Length,inputBytes);
 	}
 

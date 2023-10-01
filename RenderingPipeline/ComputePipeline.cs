@@ -100,7 +100,7 @@ public partial class ComputePipeline : SubViewport {
             blend
         );
 
-        computeHandler.addBufferUniform(color_buf,0);
+        computeHandler.putBufferUniform(color_buf,0,0);
 		// Defining a compute pipeline
 		computeHandler.createPipeline();
 
@@ -122,6 +122,7 @@ public partial class ComputePipeline : SubViewport {
         if(!Input.IsActionJustPressed("ui_up")) return;
 
         //computeHandler.dipatchPipeline(8,1,1);
+        
         // handle resizing
         if(!RD.FramebufferIsValid(framebuffer)) {
             createFrameBuffer();

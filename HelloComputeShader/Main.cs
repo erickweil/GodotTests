@@ -36,9 +36,9 @@ public partial class Main : Node3D {
 		width = 128;
 		height = 128;
 		input = new float[width * height];
-		input_buffer = computeHandler.createFloatBuffer(input);
+		input_buffer = ComputeShaderHandler.createFloatBuffer(computeHandler.rd,input);
 
-		computeHandler.addBufferUniform(input_buffer, 0, RenderingDevice.UniformType.StorageBuffer);
+		computeHandler.putBufferUniform(input_buffer, 0, 0, RenderingDevice.UniformType.StorageBuffer);
 
 		// Defining a compute pipeline
 		computeHandler.createPipeline();

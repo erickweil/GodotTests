@@ -63,52 +63,59 @@ std430: This layout works like std140, except with a few optimizations in the al
 //}
 //my_data_buffer;
 
-
-layout(set = 0, binding = 0, std430) restrict buffer UniformsBuffer {
-	uint offx;
-	uint offy;
-    uint width;
-	uint height;
-	vec4 color;
-}
-uniforms;
-
-
 // Prepare memory for the image, which will be both read and written to
 // `restrict` is used to tell the compiler that the memory will only be accessed
 // by the `heightmap` variable.
-layout(rgba8, set = 0, binding = 1) restrict uniform image2D texture;
+
+// https://vkguide.dev/docs/chapter-4/descriptors/
+layout(rgba8, set = 0, binding = 0) uniform restrict readonly image2D _grid_previous;
+layout(rgba8, set = 0, binding = 1) uniform restrict writeonly image2D _grid_current;
+
+// Our push PushConstant
+layout(push_constant, std430) uniform Params {
+	uint mousex;
+	uint mousey;
+} _params;
 
 // The code we want to execute in each invocation
 void main() {
 	// Grab the current pixel's position from the ID of this specific invocation ("thread").
 	// https://registry.khronos.org/OpenGL-Refpages/gl4/html/gl_GlobalInvocationID.xhtml
     uvec3 id = gl_GlobalInvocationID;
-	uint offx = uniforms.offx;
-	uint offy = uniforms.offy;
-	uint width = uniforms.width;
-	uint height = uniforms.height;
-	if(id.x >= width || id.x < offx || id.y >= height || id.y < offy) {
-		return;
-	}
-
-	//vec4 vert = my_data_buffer.data[id];
-    //my_data_buffer.data[id] = vec4(1.0, 0.0, 1.0, 1.0);
-
-	//vec4 bufferData = my_data_buffer.data[id];
-
+	
 	// Store the pixel back into the image.
 	// WARNING: make sure you are writing to the same coordinate that you read from.
 	// If you don't, you may end up writing to a pixel, before that pixel is read
 	// by a different invocation and cause errors.
-	vec4 color = vec4(uniforms.color.xyz,1.0);
-	vec2 pos = vec2(id.x,id.y);
-	vec2 center = vec2((width+offx)*0.5,(height+offy)*0.5);
-	float dist = clamp(distance(center,pos),0,50.0)/50.0;
+	float neighCount = 0;
+	neighCount += imageLoad(_grid_previous, ivec2(id.x-1,id.y-1)).r;
+	neighCount += imageLoad(_grid_previous, ivec2(id.x-1,id.y)).r;
+	neighCount += imageLoad(_grid_previous, ivec2(id.x-1,id.y+1)).r;
 
-	//vec4 color = vec4(1,0,0,1);
-	vec4 pixel = imageLoad(texture, ivec2(id.x,id.y));
-	vec4 newpixel = color * (1.0 - dist);
-	if(pixel.a < newpixel.a)
-	imageStore(texture, ivec2(id.x,id.y), newpixel);
+	neighCount += imageLoad(_grid_previous, ivec2(id.x,id.y-1)).r;
+	float cell = imageLoad(_grid_previous, ivec2(id.x,id.y)).r;
+	neighCount += imageLoad(_grid_previous, ivec2(id.x,id.y+1)).r;
+
+	neighCount += imageLoad(_grid_previous, ivec2(id.x+1,id.y-1)).r;
+	neighCount += imageLoad(_grid_previous, ivec2(id.x+1,id.y)).r;
+	neighCount += imageLoad(_grid_previous, ivec2(id.x+1,id.y+1)).r;
+	
+	//  mais que 3 (4,5,6,7,8,9) morre
+	//  ou menos que 2 (1,0) morre
+	if(neighCount > 3.1 || neighCount < 1.9) {
+		cell = 0.0;
+	} else if(neighCount > 2.9) { //  3 vive
+		cell = 1.0;
+	}
+	//  2 continua o valor atual
+
+	// mouse
+	//if(id.x >= _params.mousex -5 && id.x <= _params.mousex + 5 && id.y >= _params.mousey -5 && id.y <= _params.mousey + 5) {
+	if(id.y == _params.mousey) {
+		cell = 1.0;
+	}
+
+	vec4 newpixel = vec4(cell,cell,cell,1.0);
+
+	imageStore(_grid_current, ivec2(id.x,id.y), newpixel);
 }

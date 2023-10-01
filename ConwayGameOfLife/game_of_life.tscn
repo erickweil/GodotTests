@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3 uid="uid://rg4igarm6dsv"]
+[gd_scene load_steps=2 format=3 uid="uid://b5p38mu2g54xg"]
 
-[ext_resource type="Script" path="res://RenderingPipeline/ComputePipeline.cs" id="1_75ssa"]
+[ext_resource type="Script" path="res://ConwayGameOfLife/ConwayGameOfLife.cs" id="1_qoudk"]
 
 [node name="ColorRect" type="ColorRect"]
 anchors_preset = 15
@@ -25,4 +25,4 @@ handle_input_locally = false
 size = Vector2i(1152, 648)
 render_target_clear_mode = 1
 render_target_update_mode = 4
-script = ExtResource("1_75ssa")
+script = ExtResource("1_qoudk")

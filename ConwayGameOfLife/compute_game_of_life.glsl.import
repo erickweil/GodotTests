@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://cl4l2bowvj2xp"
+path="res://.godot/imported/compute_game_of_life.glsl-4c583269265cc5298cbe06de3e1c2475.res"
+
+[deps]
+
+source_file="res://ConwayGameOfLife/compute_game_of_life.glsl"
+dest_files=["res://.godot/imported/compute_game_of_life.glsl-4c583269265cc5298cbe06de3e1c2475.res"]
+
+[params]
+
