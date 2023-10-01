@@ -28,9 +28,9 @@ public class ComputeShaderHandler : IDisposable {
 	Rid shader;
 	uint local_size_x, local_size_y, local_size_z;
 	Rid pipeline;
-    public byte[] pushConstant;
+	public byte[] pushConstant;
 
-    public ComputeShaderHandler(bool local, RenderingDevice rd = null) {
+	public ComputeShaderHandler(bool local, RenderingDevice rd = null) {
 		isLocalRenderingDevice = local;
 		if(rd == null) {
 			if(isLocalRenderingDevice) {
@@ -204,8 +204,8 @@ public class ComputeShaderHandler : IDisposable {
 		}
 	}
 
-    public void Dispose()
-    {
+	public void Dispose()
+	{
 		GD.Print("Dispose ComputeShaderHandler");
 		for(int i = 0;i < uniformSets.Count; i++) {
 			if(RD.UniformSetIsValid(uniformSets[i].rid))
@@ -213,7 +213,7 @@ public class ComputeShaderHandler : IDisposable {
 		}
 		RD.FreeRid(pipeline);
 		RD.FreeRid(shader);
-    }
+	}
 
 	// =====================================================
 	// Helpers
