@@ -30,7 +30,7 @@ public partial class Main : Node3D {
 	// https://github.com/godotengine/godot/pull/79696
 	public void initializeCompute() {
 		computeHandler = new ComputeShaderHandler(false);
-		computeHandler.loadShader("res://HelloComputeShader/compute_example.glsl",8,8,1);
+		computeHandler.loadShader("res://HelloComputeShader/compute_example.glsl",64,1,1);
 
 		// Prepare our data. We use floats in the shader, so we need 32 bit.
 		width = 128;
@@ -72,10 +72,10 @@ public partial class Main : Node3D {
 
 		//GD.Print("Input: ", string.Join(", ", input));
 		//GD.Print("Output: ", string.Join(", ", output));
-		for(int i=0;i<10;i++) {
+		for(int i=0;i<128;i++) {
 			GD.Print("i:",i," "+output[i]);
 		}
-		for(int i=input.Length - 10;i<input.Length;i++) {
+		for(int i=input.Length - 128;i<input.Length;i++) {
 			GD.Print("i:",i," "+output[i]);
 		}
 
@@ -84,7 +84,7 @@ public partial class Main : Node3D {
 
 	
 	public void computeShader() {
-		computeHandler.dipatchPipeline((uint)width,(uint)height,1);
+		computeHandler.dipatchPipeline((uint)width*(uint)height,1,1);
 	}
 
 	protected override void Dispose(bool disposing) {

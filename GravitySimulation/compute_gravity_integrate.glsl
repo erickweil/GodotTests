@@ -1,24 +1,6 @@
 #[compute]
 #version 450
 
-/* https://docs.godotengine.org/en/stable/tutorials/shaders/compute_shaders.html
-These two lines communicate two things:
-    The following code is a compute shader. This is a Godot-specific hint that is needed for the editor to properly import the shader file.
-    The code is using GLSL version 450.
-	
-This code takes an array of floats, multiplies each element by 2 and store the results back in the buffer array.
-*/
-
-
-/* Invocations in the (x, y, z) dimension
-	Next, we communicate the number of invocations to be used in each workgroup. 
-	Invocations are instances of the shader that are running within the same workgroup. 
-	When we launch a compute shader from the CPU, we tell it how many workgroups to run. 
-	Workgroups run in parallel to each other.
-
-	While running one workgroup, you cannot access information in another workgroup.
-	However, invocations in the same workgroup can have some limited access to other invocations.
-*/
 // Multiply each component to calculate how many invocations per workgroup
 // 64x1x1 = 64 local invocations per workgroup.
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
@@ -59,6 +41,7 @@ layout(push_constant, std430) uniform Params {
 } _params;
 
 // The code we want to execute in each invocation
+// https://github.com/KhronosGroup/Vulkan-Samples/blob/2ce8856b7e20c28467f0b2f86429d3f54d7821a5/shaders/compute_nbody/particle_calculate.comp
 void main() {
 	// Grab the current pixel's position from the ID of this specific invocation ("thread").
 	// https://registry.khronos.org/OpenGL-Refpages/gl4/html/gl_GlobalInvocationID.xhtml
@@ -67,25 +50,10 @@ void main() {
 	vec3 pos = obj.pos;
 	vec3 vel = obj.vel;
 	float mass = obj.mass;
-	vec3 accel = vec3(0,0,0);
-
 	float dt = 0.0016666667;
-	float G = 0.01;
+
+	vec3 accel = vec3(obj.ax,obj.ay,obj.az);
 	
-	// calculate force against mouse
-	vec3 mouse = vec3(_params.mousex,_params.mousey,_params.mousez);
-	// Calculate the distance between the two objects
-	vec3 delta = mouse - pos;
-	float sqrDist = dot(delta,delta);
-	// Calculate the gravitational force magnitude between the two objects
-	float forceMagnitude = (G * mass * 100.0f) / max(0.01,sqrDist);
-	vec3 forceDirection = normalize(delta);
-
-	// Calculate the gravitational force vector
-	vec3 gravitationalForce = forceMagnitude * forceDirection;
-
-	accel += gravitationalForce;
-
 	// apply the force
 	// a = F / m
 	accel = accel / mass;
@@ -93,9 +61,9 @@ void main() {
 	vel = vel + accel * dt;
 	pos = pos + vel * dt;
 
-	if(pos.x > 5.0 || pos.x < -5.0) vel.x = -vel.x*0.99;
-	if(pos.y > 5.0 || pos.y < -5.0) vel.y = -vel.y*0.99;
-	if(pos.z > 5.0 || pos.z < -5.0) vel.z = -vel.z*0.99;
+	if(pos.x > 1.0 || pos.x < 0.0) vel.x = -vel.x*0.95;
+	if(pos.y > 1.0 || pos.y < 0.0) vel.y = -vel.y*0.95;
+	if(pos.z > 1.0 || pos.z < 0.0) vel.z = -vel.z*0.95;
 
 	pos = vec3(clamp(pos.x,0.0,1.0),clamp(pos.y,0.0,1.0),clamp(pos.z,0.0,1.0));
 
@@ -111,9 +79,14 @@ void main() {
 	//imageStore(_output_tex, ivec2(tex_x+1,tex_y), vec4(obj.upos,1.0));
 	//imageStore(_output_tex, ivec2(tex_x+2,tex_y), vec4(obj.vel,1.0));
 	//imageStore(_output_tex, ivec2(tex_x+3,tex_y), vec4(obj.color,1.0));
-
+	//float a = accel.x + accel.y + accel.z;
+	float a = mass;
 	ivec2 texcoord = ivec2(
 		clamp(obj.pos.x * _params.width,0,_params.width-1),
 		clamp(obj.pos.y * _params.width,0,_params.height-1));
-	imageStore(_output_tex, texcoord, vec4(obj.color,1.0));
+	imageStore(_output_tex, texcoord, vec4(
+		abs(a/20.0),
+		abs(a/5.0),
+		abs(a) + 0.5,
+		1.0));
 }

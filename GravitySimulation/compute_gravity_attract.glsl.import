@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://bwe0217d6xw20"
+path="res://.godot/imported/compute_gravity_attract.glsl-dde0ccb4a85047d12bba1d2c334cc047.res"
+
+[deps]
+
+source_file="res://GravitySimulation/compute_gravity_attract.glsl"
+dest_files=["res://.godot/imported/compute_gravity_attract.glsl-dde0ccb4a85047d12bba1d2c334cc047.res"]
+
+[params]
+

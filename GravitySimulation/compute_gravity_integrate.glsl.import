@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://bba2el7t7mud0"
+path="res://.godot/imported/compute_gravity_integrate.glsl-24926db59d4a4d7fb3b225db21ce1910.res"
+
+[deps]
+
+source_file="res://GravitySimulation/compute_gravity_integrate.glsl"
+dest_files=["res://.godot/imported/compute_gravity_integrate.glsl-24926db59d4a4d7fb3b225db21ce1910.res"]
+
+[params]
+

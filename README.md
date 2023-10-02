@@ -1,3 +1,7 @@
 # Godot Tests
 
-Experimentando Compute Shaders e outras coisas
+Experimenting with Compute shaders and making them easy to use.
+
+# See Also
+
+- https://github.com/KhronosGroup/Vulkan-Samples

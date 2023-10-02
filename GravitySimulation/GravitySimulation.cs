@@ -7,7 +7,8 @@ using Godot;
 public partial class GravitySimulation : SubViewport {
     // Called when the node enters the scene tree for the first time.
 	RenderingDevice RD;
-	ComputeShaderHandler computeHandler;
+	ComputeShaderHandler gravityAttract;
+	ComputeShaderHandler gravityIntegrate;
 	ComputeTexClear texClearer;
 	GObj[] objects;
 	Rid objects_buffer;
@@ -70,7 +71,7 @@ public partial class GravitySimulation : SubViewport {
             this.nObjects = nObjects;
             this.mousex = 0;
 			this.mousey = 0;
-			this.mousez = 0;
+			this.mousez = 100000.0f;
 			pad0 = 0;
 			pad1 = 0;
             // tem que ser múltiplo de 16 bytes
@@ -87,51 +88,78 @@ public partial class GravitySimulation : SubViewport {
 	// https://github.com/godotengine/godot/pull/79696
 	public void initializeCompute() {
 		RD = RenderingServer.GetRenderingDevice();
-		computeHandler = new ComputeShaderHandler(false,RD);
-		computeHandler.loadShader("res://GravitySimulation/compute_gravity.glsl",64,1,1);
+		gravityAttract = new ComputeShaderHandler(false,RD);
+		gravityAttract.loadShader("res://GravitySimulation/compute_gravity_attract.glsl",64,1,1);
 
-		// Prepare our data. We use floats in the shader, so we need 32 bit.
-		objects = new GObj[64*64*64];
-
-		Random rdn = Random.Shared;
-		for(int i=0;i<objects.Length;i++) {
-			objects[i] = new GObj(1.0f,
-				randV(rdn)/4.0f+new Vector3(0.5f,0.5f,0.5f),
-				//new Vector3(i*1.0f/objects.Length,0.5f,0.5f),
-				randV(rdn)/10.0f,
-				Color.FromHsv(rdn.NextSingle(),rdn.NextSingle(),1.0f)
-			);
-		}
-
-		objects_buffer = ComputeShaderHandler.createStructArrayBuffer(RD,objects,GObj.NUMBYTES);
-		computeHandler.putBufferUniform(objects_buffer, 0, 0, RenderingDevice.UniformType.StorageBuffer);
+		gravityIntegrate = new ComputeShaderHandler(false,RD);
+		gravityIntegrate.loadShader("res://GravitySimulation/compute_gravity_integrate.glsl",64,1,1);
 
 		var tex = GetTexture();
-		
-		//output_tex = ComputeShaderHandler.createNewRDTexture(RD,objects.Length,GObj.NUMBYTES);
-        output_tex = RenderingServer.TextureGetRdTexture(tex.GetRid());
-        computeHandler.putBufferUniform(output_tex, 0, 1, uniformType: RenderingDevice.UniformType.Image);
 
-		params_data = new ParamsBuffer((uint)tex.GetWidth(), (uint)tex.GetHeight(), (uint)objects.Length);
-        computeHandler.pushConstant = ComputeShaderHandler.GetBytesFromStruct(params_data);
+		setupObjectsBuffer(tex);
 
-		// Defining a compute pipeline
-		computeHandler.createPipeline();
+		setupAttract();
+		setupIntegrate(tex);
 
+		// setup texClearer
 		texClearer = new ComputeTexClear(false,RD);
 		texClearer.assignTexture(output_tex);
 
 		//var viewport = GetViewport() as SubViewport;
 		//viewport.RenderTargetClearMode = ClearMode.Always;
 
-		testar();
+		testar(1);
+	}
+
+	public void setupObjectsBuffer(ViewportTexture tex) {
+		objects = new GObj[64*64*2];
+
+		Random rdn = Random.Shared;
+		for(int i=0;i<objects.Length;i++) {
+			Vector3 poff = i > objects.Length / 2 ? new Vector3(0.75f,0.25f,0.5f) : new Vector3(0.25f,0.25f,0.5f);
+			Vector3 voff = i > objects.Length / 2 ? new Vector3(0.0f,0.15f,0.0f) : new Vector3(0.0f,-0.15f,0.0f);
+			objects[i] = new GObj(rdn.NextSingle()*rdn.NextSingle() * 8.0f,
+				randV(rdn)/16.0f+poff,
+				//new Vector3(i*1.0f/objects.Length,0.5f,0.5f),
+				randV(rdn)/4.0f+voff,
+				Color.FromHsv(rdn.NextSingle(),rdn.NextSingle(),1.0f)
+			);
+		}
+
+		objects_buffer = ComputeShaderHandler.createStructArrayBuffer(RD,objects,GObj.NUMBYTES);
+
+		params_data = new ParamsBuffer((uint)tex.GetWidth(), (uint)tex.GetHeight(), (uint)objects.Length);
+	}
+
+	public void setupAttract() {
+		gravityAttract.putBufferUniform(objects_buffer, 0, 0, RenderingDevice.UniformType.StorageBuffer);
+
+        gravityAttract.pushConstant = ComputeShaderHandler.GetBytesFromStruct(params_data);
+
+		gravityAttract.createPipeline();
+	}
+
+	public void setupIntegrate(ViewportTexture tex) {
+		gravityIntegrate.putBufferUniform(objects_buffer, 0, 0, RenderingDevice.UniformType.StorageBuffer);
+
+		//output_tex = ComputeShaderHandler.createNewRDTexture(RD,objects.Length,GObj.NUMBYTES);
+        output_tex = RenderingServer.TextureGetRdTexture(tex.GetRid());
+        gravityIntegrate.putBufferUniform(output_tex, 0, 1, uniformType: RenderingDevice.UniformType.Image);
+
+        gravityIntegrate.pushConstant = ComputeShaderHandler.GetBytesFromStruct(params_data);
+
+		gravityIntegrate.createPipeline();
 	}
 
 	// Called every frame. 'delta' is the elapsed time since the previous frame.
 	//public override void _Process(double delta)
 	public override void _Process(double delta)	{
 		if(Input.IsActionPressed("ui_up")) {
-			testar();
+			testar(1);
+		}
+
+		if(Input.IsActionPressed("ui_left")) {
+			testar(100);
 		}
 
 		if(Input.IsActionJustPressed("ui_down")) {
@@ -139,7 +167,7 @@ public partial class GravitySimulation : SubViewport {
 		}
 	}
 
-	public void testar() {
+	public void testar(int steps) {
 		ulong startTime = startMeasure();
 
 		var tex = GetTexture();
@@ -147,16 +175,27 @@ public partial class GravitySimulation : SubViewport {
 		int height = tex.GetHeight();
 		Vector2 pos = GetMousePosition();
 
+		if(Input.IsMouseButtonPressed(MouseButton.Left)) {
+			params_data.mousex = pos.X / width;
+			params_data.mousey = pos.Y / width;
+			params_data.mousez = 0.5f;
+		}
 
+		byte[] pushConstant = ComputeShaderHandler.GetBytesFromStruct(params_data);
+
+		gravityAttract.pushConstant = pushConstant;
+		gravityIntegrate.pushConstant = pushConstant;
+
+		// Limpa a textura só uma vez
 		texClearer.runClear(Color.Color8(0,0,0),(uint)width,(uint)height);
 
-		
-		params_data.mousex = pos.X / width;
-		params_data.mousey = pos.Y / width;
-		params_data.mousez = 0.5f;
-        computeHandler.pushConstant = ComputeShaderHandler.GetBytesFromStruct(params_data);
+		for(int i=0;i<steps;i++) {
+			gravityAttract.dipatchPipeline((uint)objects.Length,1,1);
 
-		computeHandler.dipatchPipeline((uint)objects.Length,1,1);
+			// Barrier? precisa mesmo disso?
+
+			gravityIntegrate.dipatchPipeline((uint)objects.Length,1,1);
+		}
 
 		if(Input.IsActionJustPressed("ui_up")) {
 			
@@ -170,7 +209,7 @@ public partial class GravitySimulation : SubViewport {
 		
 		// Read back the data from the buffers
 		GObj[] output = new GObj[objects.Length];
-		computeHandler.readStructArrayBuffer(objects_buffer,output);
+		gravityIntegrate.readStructArrayBuffer(objects_buffer,output);
 		//var output =  computeHandler.readFloatBuffer(input_buffer);
 
 		//GD.Print("Input: ", string.Join(", ", input));
@@ -187,7 +226,9 @@ public partial class GravitySimulation : SubViewport {
 
 	protected override void Dispose(bool disposing) {
 		base.Dispose(disposing);
-		computeHandler.Dispose();
+		gravityAttract.Dispose();
+		gravityIntegrate.Dispose();
+		texClearer.Dispose();
 		RD.FreeRid(objects_buffer);
 	}
 

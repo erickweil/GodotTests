@@ -19,8 +19,8 @@ This code takes an array of floats, multiplies each element by 2 and store the r
 	However, invocations in the same workgroup can have some limited access to other invocations.
 */
 // Multiply each component to calculate how many invocations per workgroup
-// 8x8x1 = 64 local invocations per workgroup.
-layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+// 64x1x1 = 64 local invocations per workgroup.
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
 
 /* A binding to the buffer we create in our script
@@ -63,12 +63,37 @@ layout(set = 0, binding = 0, std430) restrict buffer MyDataBuffer {
 }
 my_data_buffer;
 
+// Share data between computer shader invocations
+shared float sharedData[64];
+
 // The code we want to execute in each invocation
 void main() {
 	// Grab the current pixel's position from the ID of this specific invocation ("thread").
 	// https://registry.khronos.org/OpenGL-Refpages/gl4/html/gl_GlobalInvocationID.xhtml
-    ivec2 coords = ivec2(gl_GlobalInvocationID.xy);
-	uint bufferIndex = coords.y*128 + coords.x;
-    my_data_buffer.data[bufferIndex] = my_data_buffer.data[bufferIndex] + (bufferIndex / (128.0*128.0));
+    //ivec2 coords = ivec2(gl_GlobalInvocationID.xy);
+	//uint bufferIndex = coords.y*128 + coords.x;
+	//float factor = bufferIndex / (128.0*128.0);
+
+	uint bufferIndex = gl_GlobalInvocationID.x;
+	float factor = bufferIndex * 1.0;
+
+	sharedData[gl_LocalInvocationIndex] = factor;
+
+	/*  https://registry.khronos.org/OpenGL-Refpages/gl4/html/barrier.xhtml
+		For any given static instance of barrier in a compute shader, all invocations within a single work group must enter
+		 it before any are allowed to continue beyond it. This ensures that values written by one invocation prior to a given 
+		 static instance of barrier can be safely read by other invocations after their call to the same static instance of barrier.
+	*/
+	// Even though this slow things down, Without this barrier, the values can be trash when reading below
+	barrier();
+
+	// Now we can read from the shared data
+	float sum = 0.0;
+	for (int j = 0; j < 64; j++)
+	{
+		sum = max(sharedData[j], sum);
+	}
+
+    my_data_buffer.data[bufferIndex] = sum;
 	
 }
