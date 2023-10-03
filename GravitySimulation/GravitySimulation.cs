@@ -111,20 +111,32 @@ public partial class GravitySimulation : SubViewport {
 		testar(1);
 	}
 
+	public void spawnRandomObjs(Vector3 poff, Vector3 voff, int nStart, int nEnd, Color color) {
+		Random rdn = Random.Shared;
+		for(int i=nStart;i< nEnd && i < objects.Length;i++) {
+			objects[i] = new GObj(1.0f,
+				randV(rdn)/16.0f+poff,
+				//new Vector3(i*1.0f/objects.Length,0.5f,0.5f),
+				randV(rdn)/4.0f+voff,
+				color
+				//Color.FromHsv(rdn.NextSingle(),rdn.NextSingle(),1.0f)
+			);
+		}
+	}
+
 	public void setupObjectsBuffer(ViewportTexture tex) {
 		objects = new GObj[64*64*2];
 
 		Random rdn = Random.Shared;
-		for(int i=0;i<objects.Length;i++) {
-			Vector3 poff = i > objects.Length / 2 ? new Vector3(0.75f,0.25f,0.5f) : new Vector3(0.25f,0.25f,0.5f);
-			Vector3 voff = i > objects.Length / 2 ? new Vector3(0.0f,0.15f,0.0f) : new Vector3(0.0f,-0.15f,0.0f);
-			objects[i] = new GObj(rdn.NextSingle()*rdn.NextSingle() * 8.0f,
-				randV(rdn)/16.0f+poff,
-				//new Vector3(i*1.0f/objects.Length,0.5f,0.5f),
-				randV(rdn)/4.0f+voff,
-				Color.FromHsv(rdn.NextSingle(),rdn.NextSingle(),1.0f)
-			);
+		for(int i=0;i<32;i++) {
+			int n3 = objects.Length/32;
+			float rotInc = (Mathf.Pi*2.0f) / 32.0f;
+			Transform3D rot = Transform3D.Identity.Rotated(new Vector3(0.0f,1.0f,0.0f),rotInc * i);
+			Vector3 origin = rot * new Vector3(0.45f,0.0f,0);
+			Vector3 vel = rot * new Vector3(0.0f,0.0f,1.2f);
+			spawnRandomObjs(origin/2.0f + new Vector3(0.5f,0.5f,0.5f),vel,n3*i,n3*(i+1), Color.FromHsv(rdn.NextSingle(),rdn.NextSingle(),1.0f));
 		}
+		
 
 		objects_buffer = ComputeShaderHandler.createStructArrayBuffer(RD,objects,GObj.NUMBYTES);
 
@@ -175,9 +187,9 @@ public partial class GravitySimulation : SubViewport {
 		int height = tex.GetHeight();
 		Vector2 pos = GetMousePosition();
 
-		if(Input.IsMouseButtonPressed(MouseButton.Left)) {
 			params_data.mousex = pos.X / width;
 			params_data.mousey = pos.Y / width;
+		if(Input.IsMouseButtonPressed(MouseButton.Left)) {
 			params_data.mousez = 0.5f;
 		}
 

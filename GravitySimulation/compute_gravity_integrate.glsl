@@ -79,14 +79,15 @@ void main() {
 	//imageStore(_output_tex, ivec2(tex_x+1,tex_y), vec4(obj.upos,1.0));
 	//imageStore(_output_tex, ivec2(tex_x+2,tex_y), vec4(obj.vel,1.0));
 	//imageStore(_output_tex, ivec2(tex_x+3,tex_y), vec4(obj.color,1.0));
-	//float a = accel.x + accel.y + accel.z;
-	float a = mass;
-	ivec2 texcoord = ivec2(
-		clamp(obj.pos.x * _params.width,0,_params.width-1),
-		clamp(obj.pos.y * _params.width,0,_params.height-1));
+	float a = abs(accel.x) + abs(accel.y) + abs(accel.z);
+	//float a = mass;
+	//float a = pos.z;
+
+	vec2 projected = vec2((pos.x-0.5) + (_params.mousex - 0.5)*3.0,(pos.y-0.5) +  (_params.mousey - 0.5)*3.0) / (pos.z + 1.0);
+
+	ivec2 texcoord = ivec2(clamp((projected.x+0.5) * _params.height,0,_params.width-1),
+		clamp((projected.y+0.5) * _params.height,0,_params.height-1));	
 	imageStore(_output_tex, texcoord, vec4(
-		abs(a/20.0),
-		abs(a/5.0),
-		abs(a) + 0.5,
+		obj.color,
 		1.0));
 }
