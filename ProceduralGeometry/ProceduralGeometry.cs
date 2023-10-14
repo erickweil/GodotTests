@@ -2,8 +2,13 @@ using System;
 using System.Runtime.Intrinsics.Arm;
 using Godot;
 
-// A ideia é ser capaz de Renderizar algo no Compute shader e então ver
-// o resultado sem uma leitura no CPU
+// Example showing the use of a Texture2DRD as a means of
+// comunicating between the compute shader and the mesh being drawn.
+
+// The texture is in format R32G32B32A32Sfloat which means that it contains arbitrary floating points
+// and the compute shader updates vertice position and normal info into the texture EACH FRAME without problems.
+
+// Hold G to see it in action
 public partial class ProceduralGeometry : Node3D {
 	
 	[Export]
@@ -13,18 +18,18 @@ public partial class ProceduralGeometry : Node3D {
 		public uint texWidth;
 		public uint texHeight;
 		public float cubeSize;
-		public uint maxTriangles;
+		public uint maxQuads;
 
 		public float offx;
 		public float offy;
 		public float offz;
 		float pad0;
-		public UniformBuffer(uint texWidth, uint texHeight,float cubeSize, uint maxTriangles)
+		public UniformBuffer(uint texWidth, uint texHeight,float cubeSize, uint maxQuads)
 		{
 			this.texWidth = texWidth;
 			this.texHeight = texHeight;
 			this.cubeSize = cubeSize;
-			this.maxTriangles = maxTriangles;
+			this.maxQuads = maxQuads;
 
 			// tem que ser múltiplo de 16 bytes
 		}
@@ -39,7 +44,7 @@ public partial class ProceduralGeometry : Node3D {
 		shader_texture = new Texture2Drd();
 		material.SetShaderParameter("image", shader_texture);
 
-		meshInstance.Mesh = getTrianglesMesh((tex_size * tex_size)/3);
+		meshInstance.Mesh = getQuadsMesh((tex_size * tex_size)/4);
 	}
 
 	public override void _Process(double delta)
@@ -48,14 +53,13 @@ public partial class ProceduralGeometry : Node3D {
 
 		shader_texture.TextureRdRid = current_tex;
 
-		Vector2 mouse = Input.GetLastMouseVelocity();
-		//meshInstance.RotateX(0.005f * (float)delta * mouse.X);
-		//meshInstance.RotateY(0.005f * (float)delta * mouse.Y);
+		if(Input.IsPhysicalKeyPressed(Key.G)) {
+			Vector2 mouse = Input.GetLastMouseVelocity();
 
-		mouse_off += (float)delta * new Vector3(mouse.Y / 500.0f,0,  -mouse.X / 500.0f);
+			mouse_off += (float)delta * new Vector3(mouse.Y / 1000.0f,0,  -mouse.X / 1000.0f);
 
-		if(Input.IsActionJustPressed("ui_up") || Input.IsActionPressed("ui_down"))
-		RenderingServer.CallOnRenderThread(Callable.From(computeProcess));
+			RenderingServer.CallOnRenderThread(Callable.From(computeProcess));
+		}
 	}
 
 	public override void _ExitTree()
@@ -69,29 +73,39 @@ public partial class ProceduralGeometry : Node3D {
 		RenderingServer.CallOnRenderThread(Callable.From(computeDispose));
 	}
 
-	public ArrayMesh getTrianglesMesh(int nTriangles) {
+	// Generate a mesh that every 4 vertices define a disconected quad
+	public ArrayMesh getQuadsMesh(int nQuads) {
 
 		// https://docs.godotengine.org/en/stable/tutorials/3d/procedural_geometry/arraymesh.html#doc-arraymesh
 		var surfaceArray = new Godot.Collections.Array();
 		surfaceArray.Resize((int)Mesh.ArrayType.Max);
 
-		Vector3[] pos = new Vector3[nTriangles*3];
-		Vector2[] uv = new Vector2[nTriangles*3];
-		int[] indices = new int[nTriangles*3];
-		for(int i=0;i<nTriangles;i++) {
-			int i0 = i*3 + 0;
-			int i1 = i*3 + 1;
-			int i2 = i*3 + 2;
+		Vector3[] pos = new Vector3[nQuads*4];
+		Vector2[] uv = new Vector2[nQuads*4];
+		int[] indices = new int[nQuads*6];
+		for(int i=0;i<nQuads;i++) {
+			int i0 = i*4 + 0;
+			int i1 = i*4 + 1;
+			int i2 = i*4 + 2;
+			int i3 = i*4 + 3;
 			Vector3 off = new Vector3(i % tex_size, 0 , i / tex_size);
-			pos[i0] = new Vector3(1,0,0) + off;
+			
+			pos[i0] = new Vector3(0,0,0) + off;
 			pos[i1] = new Vector3(0,0,1) + off;
-			pos[i2] = new Vector3(0,0,0) + off;
-			uv[i0] = new Vector2(1,0);
+			pos[i2] = new Vector3(1,0,1) + off;
+			pos[i3] = new Vector3(0,0,1) + off;
+
+			uv[i0] = new Vector2(0,0);
 			uv[i1] = new Vector2(0,1);
-			uv[i2] = new Vector2(0,0);
-			indices[i0] = i0;
-			indices[i1] = i1;
-			indices[i2] = i2;
+			uv[i2] = new Vector2(1,1);
+			uv[i3] = new Vector2(0,1);
+
+			indices[i*6+0] = i0;
+			indices[i*6+1] = i1;
+			indices[i*6+2] = i2;
+			indices[i*6+3] = i2;
+			indices[i*6+4] = i3;
+			indices[i*6+5] = i0;
 		}
 		
 		// Convert Lists to arrays and assign to surface array
@@ -125,8 +139,13 @@ public partial class ProceduralGeometry : Node3D {
 	// Need to run on Render Thread
 	// =============================
 	Vector3 mouse_off;
-	int tex_size = 256;
-	float cube_size = 64.0f;
+
+	// Change this accordingly.
+	// tex_size should be choosed so that (tex_size*tex_size)/2 equals the maximum amount of vertices
+	int tex_size = 1024;
+	// cube_size defines the resolution of the cube that will be calculated on compute_shader
+	// higher values means better resolution, but possibly produce also more quads, so update tex_size
+	float cube_size = 128.0f;
 	Rid current_tex;
 
 	Rid counter_buffer;
@@ -137,7 +156,7 @@ public partial class ProceduralGeometry : Node3D {
 	ComputeShaderHandler computeHandler;
 
 	public void createUniforms(int width, int height, float cubeSize) {
-		uniformBuffer_data = new UniformBuffer((uint)width, (uint)height, cubeSize, (uint)((width * height)/3));
+		uniformBuffer_data = new UniformBuffer((uint)width, (uint)height, cubeSize, (uint)((width * height)/4));
 		computeHandler.pushConstant = ComputeShaderHandler.GetBytesFromStruct(uniformBuffer_data);
 
 		current_tex = ComputeShaderHandler.createNewRDTexture(RD,width,height, format: RenderingDevice.DataFormat.R32G32B32A32Sfloat, usageBits: ComputeShaderHandler.UsageBitsForTexture2DRD);
@@ -157,38 +176,34 @@ public partial class ProceduralGeometry : Node3D {
 		
 		// Defining a compute pipeline
 		computeHandler.createPipeline();
+
+
+		// Run the first time
+		computeProcess();
 	}
 
 	public void computeProcess() {
 		ulong startTime = Time.GetTicksUsec();
 
 		if(!RD.UniformSetIsValid(computeHandler.uniformSets[0].rid)) {
-			//GD.Print("Re-doing uniform set");
-			//computeHandler.resetUniformSets();
-			//RD.FreeRid(current_tex);
-			//createUniforms(tex_size,tex_size);
-			//computeHandler.createUniformSet(0);
-
 			GD.PrintErr("Uniform set invalid");
 			return;
 		}
-
-		// uniformBuffer_data.width = width;
-		// uniformBuffer_data.height = height;
-		// uniformBuffer_data.mousex = (uint)Math.Clamp((int)pos.X,0,(int)width);
-		// uniformBuffer_data.mousey = (uint)Math.Clamp((int)pos.Y,0,(int)height);
-		// computeHandler.pushConstant = ComputeShaderHandler.GetBytesFromStruct(uniformBuffer_data);
 
 		uniformBuffer_data.offx = mouse_off.X;
 		uniformBuffer_data.offy = mouse_off.Y;
 		uniformBuffer_data.offz = mouse_off.Z;
 		computeHandler.pushConstant = ComputeShaderHandler.GetBytesFromStruct(uniformBuffer_data);
 
+		// Clear the texture
+		RD.TextureClear(current_tex, new Color(0,0,0,0), 0, 1, 0, 1);
+
 		// Resetar counter
 		uint[] input = new uint[1] {0};
 		ComputeShaderHandler.updateBufferFromArray(computeHandler.RD, counter_buffer,input,sizeof(uint));
 
-		computeHandler.dipatchPipeline(64,64,64);
+		uint invocations = (uint)(int)cube_size;
+		computeHandler.dipatchPipeline(invocations,invocations,invocations);
 
 		// If you want the output of a compute shader to be used as input of
 		// another computer shader you'll need to add a barrier:

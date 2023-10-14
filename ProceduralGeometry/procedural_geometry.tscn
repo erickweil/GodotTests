@@ -1,7 +1,9 @@
-[gd_scene load_steps=8 format=3 uid="uid://dwnbmbyuboe1g"]
+[gd_scene load_steps=12 format=3 uid="uid://dwnbmbyuboe1g"]
 
 [ext_resource type="Script" path="res://ProceduralGeometry/ProceduralGeometry.cs" id="1_acac7"]
 [ext_resource type="Shader" path="res://ProceduralGeometry/procedural_geometry.gdshader" id="1_lclr1"]
+[ext_resource type="Script" path="res://ProceduralGeometry/OrbitController.cs" id="2_qiusm"]
+[ext_resource type="Texture2D" uid="uid://ud6ib363jivl" path="res://icon.svg" id="4_ae4vn"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_anfc1"]
 sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
@@ -22,6 +24,11 @@ shader = ExtResource("1_lclr1")
 
 [sub_resource type="SphereMesh" id="SphereMesh_ony0g"]
 
+[sub_resource type="PlaneMesh" id="PlaneMesh_p0yxd"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hrkta"]
+albedo_texture = ExtResource("4_ae4vn")
+
 [node name="Node3D" type="Node3D" node_paths=PackedStringArray("meshInstance")]
 script = ExtResource("1_acac7")
 meshInstance = NodePath("MeshInstance3D")
@@ -33,11 +40,19 @@ environment = SubResource("Environment_51126")
 transform = Transform3D(-0.866023, -0.433016, 0.250001, 0.250002, 0.0580112, 0.966506, -0.433016, 0.899517, 0.0580157, 0, 0, 0)
 shadow_enabled = true
 
-[node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(0.39421, -0.633632, 0.665665, -0.0645039, 0.703457, 0.707805, -0.916754, -0.321962, 0.236438, 0.82006, 0.79499, 0.292231)
+[node name="CameraPivot" type="Node3D" parent="."]
+script = ExtResource("2_qiusm")
+
+[node name="Camera3D" type="Camera3D" parent="CameraPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
 cull_mask = 1048573
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
 material_override = SubResource("ShaderMaterial_114wt")
 mesh = SubResource("SphereMesh_ony0g")
 skeleton = NodePath("")
+
+[node name="Ground" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+mesh = SubResource("PlaneMesh_p0yxd")
+surface_material_override/0 = SubResource("StandardMaterial3D_hrkta")
