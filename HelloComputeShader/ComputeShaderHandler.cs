@@ -219,14 +219,38 @@ public class ComputeShaderHandler : IDisposable {
 	// Helpers
 	// =====================================================
 	// https://github.com/godotengine/godot-demo-projects/tree/65b34f81920752a382d14d544aa451de46b32a07/misc/compute_shader_heightmap
-	public static Rid createNewRDTexture(RenderingDevice rd,int widht, int height, RenderingDevice.DataFormat format = RenderingDevice.DataFormat.R8G8B8A8Unorm) {
+
+	public const RenderingDevice.TextureUsageBits UsageBitsForTexture2DRD = 
+		  RenderingDevice.TextureUsageBits.SamplingBit
+		| RenderingDevice.TextureUsageBits.StorageBit // for be used as uniform
+		| RenderingDevice.TextureUsageBits.CanUpdateBit 
+		| RenderingDevice.TextureUsageBits.CanCopyFromBit 
+		| RenderingDevice.TextureUsageBits.CanCopyToBit;
+
+	public const RenderingDevice.TextureUsageBits UsageBitsForCompute =
+	      RenderingDevice.TextureUsageBits.StorageBit  // for be used as uniform
+		| RenderingDevice.TextureUsageBits.CanUpdateBit 
+		| RenderingDevice.TextureUsageBits.CanCopyFromBit 
+		| RenderingDevice.TextureUsageBits.CanCopyToBit;
+
+	public static Rid createNewRDTexture(RenderingDevice rd,
+	int widht, int height, 
+	bool clear = true,
+	RenderingDevice.DataFormat format = RenderingDevice.DataFormat.R8G8B8A8Unorm,
+	RenderingDevice.TextureUsageBits usageBits = UsageBitsForCompute) {
 		var textureFormat = new RDTextureFormat();
 		textureFormat.Format = format;
 		textureFormat.Width = (uint)widht;
 		textureFormat.Height = (uint)height;
-		textureFormat.UsageBits = RenderingDevice.TextureUsageBits.StorageBit | RenderingDevice.TextureUsageBits.CanUpdateBit | RenderingDevice.TextureUsageBits.CanCopyToBit;
+		textureFormat.UsageBits = usageBits;
 
 		var textureRid = rd.TextureCreate(textureFormat,new RDTextureView());
+
+		if(clear) {
+			// CLEAR THE TEXTURE BEFORE USAGE
+        	rd.TextureClear(textureRid, new Color(0,0,0,0), 0, 1, 0, 1);
+		}
+
 		return textureRid;
 	}
 
@@ -242,14 +266,7 @@ public class ComputeShaderHandler : IDisposable {
 	}
 
 	public static Rid createStructArrayBuffer<T>(RenderingDevice rd,T[] input, int elementSize) {
-		var inputBytes = new byte[input.Length * elementSize];
-		
-		// Não funciona BlockCopy https://stackoverflow.com/questions/33181945/blockcopy-a-class-getting-object-must-be-an-array-of-primitives
-		for(int i = 0;i< input.Length;i++) {
-			byte[] elemBytes = GetBytesFromStruct(input[i]);
-
-			Buffer.BlockCopy(elemBytes, 0, inputBytes, i * elementSize, elemBytes.Length);
-		}
+		var inputBytes = GetBytesFromArray(input,elementSize);
 
 		// Create a storage buffer that can hold our float values.
 		// Each float has 4 bytes (32 bit) so 10 x 4 = 40 bytes
@@ -267,6 +284,12 @@ public class ComputeShaderHandler : IDisposable {
 	}
 
 	public static void updateBufferFromBytes(RenderingDevice rd, Rid buffer, byte[] inputBytes) {
+		rd.BufferUpdate(buffer,0,(uint)inputBytes.Length,inputBytes);
+	}
+
+	public static void updateBufferFromArray<T>(RenderingDevice rd, Rid buffer, T[] input, int elementSize) {
+		var inputBytes = GetBytesFromArray(input,elementSize);
+		
 		rd.BufferUpdate(buffer,0,(uint)inputBytes.Length,inputBytes);
 	}
 
@@ -291,6 +314,19 @@ public class ComputeShaderHandler : IDisposable {
 		}
 
 		return arr;
+	}
+
+	public static byte[] GetBytesFromArray<T>(T[] input, int elementSize) {
+		var inputBytes = new byte[input.Length * elementSize];
+		
+		// Não funciona BlockCopy https://stackoverflow.com/questions/33181945/blockcopy-a-class-getting-object-must-be-an-array-of-primitives
+		for(int i = 0;i< input.Length;i++) {
+			byte[] elemBytes = GetBytesFromStruct(input[i]);
+
+			Buffer.BlockCopy(elemBytes, 0, inputBytes, i * elementSize, elemBytes.Length);
+		}
+
+		return inputBytes;
 	}
 
 	public float[] readFloatBuffer(Rid buffer) {

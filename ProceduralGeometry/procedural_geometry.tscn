@@ -1,0 +1,43 @@
+[gd_scene load_steps=8 format=3 uid="uid://dwnbmbyuboe1g"]
+
+[ext_resource type="Script" path="res://ProceduralGeometry/ProceduralGeometry.cs" id="1_acac7"]
+[ext_resource type="Shader" path="res://ProceduralGeometry/procedural_geometry.gdshader" id="1_lclr1"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_anfc1"]
+sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+ground_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+
+[sub_resource type="Sky" id="Sky_uy1cp"]
+sky_material = SubResource("ProceduralSkyMaterial_anfc1")
+
+[sub_resource type="Environment" id="Environment_51126"]
+background_mode = 2
+sky = SubResource("Sky_uy1cp")
+tonemap_mode = 2
+glow_enabled = true
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_114wt"]
+render_priority = 0
+shader = ExtResource("1_lclr1")
+
+[sub_resource type="SphereMesh" id="SphereMesh_ony0g"]
+
+[node name="Node3D" type="Node3D" node_paths=PackedStringArray("meshInstance")]
+script = ExtResource("1_acac7")
+meshInstance = NodePath("MeshInstance3D")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_51126")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="WorldEnvironment"]
+transform = Transform3D(-0.866023, -0.433016, 0.250001, 0.250002, 0.0580112, 0.966506, -0.433016, 0.899517, 0.0580157, 0, 0, 0)
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(0.39421, -0.633632, 0.665665, -0.0645039, 0.703457, 0.707805, -0.916754, -0.321962, 0.236438, 0.82006, 0.79499, 0.292231)
+cull_mask = 1048573
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("ShaderMaterial_114wt")
+mesh = SubResource("SphereMesh_ony0g")
+skeleton = NodePath("")

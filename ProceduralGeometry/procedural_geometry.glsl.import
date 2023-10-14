@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://8luab42riuqs"
+path="res://.godot/imported/procedural_geometry.glsl-517d1cc89ec2b21d1c37ad2cebfb2bc4.res"
+
+[deps]
+
+source_file="res://ProceduralGeometry/procedural_geometry.glsl"
+dest_files=["res://.godot/imported/procedural_geometry.glsl-517d1cc89ec2b21d1c37ad2cebfb2bc4.res"]
+
+[params]
+
