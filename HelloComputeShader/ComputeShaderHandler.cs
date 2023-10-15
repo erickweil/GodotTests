@@ -223,8 +223,7 @@ public class ComputeShaderHandler : IDisposable {
 	public const RenderingDevice.TextureUsageBits UsageBitsForTexture2DRD = 
 		  RenderingDevice.TextureUsageBits.SamplingBit
 		| RenderingDevice.TextureUsageBits.StorageBit // for be used as uniform
-		| RenderingDevice.TextureUsageBits.CanUpdateBit 
-		| RenderingDevice.TextureUsageBits.CanCopyFromBit 
+		| RenderingDevice.TextureUsageBits.CanUpdateBit
 		| RenderingDevice.TextureUsageBits.CanCopyToBit;
 
 	public const RenderingDevice.TextureUsageBits UsageBitsForCompute =
@@ -242,9 +241,13 @@ public class ComputeShaderHandler : IDisposable {
 		textureFormat.Format = format;
 		textureFormat.Width = (uint)widht;
 		textureFormat.Height = (uint)height;
+		textureFormat.Depth = 1;
 		textureFormat.UsageBits = usageBits;
+		textureFormat.Mipmaps = 1;
+		textureFormat.Samples = RenderingDevice.TextureSamples.Samples1;
 
 		var textureRid = rd.TextureCreate(textureFormat,new RDTextureView());
+		//var textureRid = rd.TextureBufferCreate((uint)(widht*height*16),format);
 
 		if(clear) {
 			// CLEAR THE TEXTURE BEFORE USAGE

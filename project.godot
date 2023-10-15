@@ -11,9 +11,13 @@ config_version=5
 [application]
 
 config/name="GodotTests"
-run/main_scene="res://ConwayGameOfLife/game_of_life.tscn"
+run/main_scene="res://ProceduralGeometry/procedural_geometry.tscn"
 config/features=PackedStringArray("4.2", "C#", "Forward Plus")
 config/icon="res://icon.svg"
+
+[display]
+
+window/size/mode=2
 
 [dotnet]
 

@@ -20,7 +20,7 @@ layout(push_constant, std430) uniform Params {
 	uint texWidth;
 	uint texHeight;
 	float cubeSize;
-	uint maxQuads;
+	uint maxTriangles;
 	float offx;
 	float offy;
 	float offz;
@@ -38,35 +38,35 @@ void storeVertex(vec3 v, vec3 n, uint index) {
 	imageStore(_output_tex, n_id, vec4(n.x,n.y,n.z,1));
 }
 
-// void addTriangle(vec3 pos0, vec3 pos1, vec3 pos2) {
-// 	// atomicAdd performs an atomic addition of data to the contents of mem and returns the original contents of mem from before the addition occurred.
-// 	uint triangleIndex = atomicAdd(_counter_buff.count, 1);
+void addTriangle(vec3 pos0, vec3 pos1, vec3 pos2, vec3 normal) {
+// atomicAdd performs an atomic addition of data to the contents of mem and returns the original contents of mem from before the addition occurred.
+	uint triangleIndex = atomicAdd(_counter_buff.count, 1);
 
-// 	// Garantir nao dar overflow
-// 	if(triangleIndex > _params.maxTriangles) {
-// 		return;
-// 	}
-
-// 	storeV3(pos0, triangleIndex*3 + 0);
-// 	storeV3(pos1, triangleIndex*3 + 1);
-// 	storeV3(pos2, triangleIndex*3 + 2);
-// }
-
-void addQuad(vec3 pos0, vec3 pos1, vec3 pos2, vec3 pos3, vec3 normal) {
-	//addTriangle(pos0,pos1,pos2);
-	//addTriangle(pos2,pos3,pos0);
-
-	// atomicAdd performs an atomic addition of data to the contents of mem and returns the original contents of mem from before the addition occurred.
-	uint quadIndex = atomicAdd(_counter_buff.count, 1);
-
-	if(quadIndex > _params.maxQuads) {
+ 	// Garantir nao dar overflow
+ 	if(triangleIndex > _params.maxTriangles) {
  		return;
  	}
 
- 	storeVertex(pos0, normal, quadIndex*4 + 0);
- 	storeVertex(pos1, normal, quadIndex*4 + 1);
- 	storeVertex(pos2, normal, quadIndex*4 + 2);
-	storeVertex(pos3, normal, quadIndex*4 + 3);
+ 	storeVertex(pos0, normal, triangleIndex*3 + 0);
+ 	storeVertex(pos1, normal, triangleIndex*3 + 1);
+ 	storeVertex(pos2, normal, triangleIndex*3 + 2);
+}
+
+void addQuad(vec3 pos0, vec3 pos1, vec3 pos2, vec3 pos3, vec3 normal) {
+	addTriangle(pos0,pos1,pos2, normal);
+	addTriangle(pos2,pos3,pos0, normal);
+
+	// // atomicAdd performs an atomic addition of data to the contents of mem and returns the original contents of mem from before the addition occurred.
+	// uint quadIndex = atomicAdd(_counter_buff.count, 1);
+
+	// if(quadIndex > _params.maxQuads) {
+ 	// 	return;
+ 	// }
+
+ 	// storeVertex(pos0, normal, quadIndex*4 + 0);
+ 	// storeVertex(pos1, normal, quadIndex*4 + 1);
+ 	// storeVertex(pos2, normal, quadIndex*4 + 2);
+	// storeVertex(pos3, normal, quadIndex*4 + 3);
 }
 
 // https://iquilezles.org/articles/distfunctions/

@@ -18,18 +18,20 @@ public partial class ProceduralGeometry : Node3D {
 		public uint texWidth;
 		public uint texHeight;
 		public float cubeSize;
-		public uint maxQuads;
+		public uint maxTris;
 
 		public float offx;
 		public float offy;
 		public float offz;
 		float pad0;
-		public UniformBuffer(uint texWidth, uint texHeight,float cubeSize, uint maxQuads)
+		public UniformBuffer(uint texWidth, uint texHeight,float cubeSize, uint maxTris)
 		{
 			this.texWidth = texWidth;
 			this.texHeight = texHeight;
 			this.cubeSize = cubeSize;
-			this.maxQuads = maxQuads;
+			this.maxTris = maxTris;
+			
+			offx = 0; offy = 0; offz = 0; pad0 = 0;
 
 			// tem que ser múltiplo de 16 bytes
 		}
@@ -44,7 +46,8 @@ public partial class ProceduralGeometry : Node3D {
 		shader_texture = new Texture2Drd();
 		material.SetShaderParameter("image", shader_texture);
 
-		meshInstance.Mesh = getQuadsMesh((tex_size * tex_size)/4);
+		int vertices = (tex_size * tex_size) / pixels_per_vertex;
+		meshInstance.Mesh = getTrianglesMesh(vertices / 3);
 	}
 
 	public override void _Process(double delta)
@@ -73,39 +76,33 @@ public partial class ProceduralGeometry : Node3D {
 		RenderingServer.CallOnRenderThread(Callable.From(computeDispose));
 	}
 
-	// Generate a mesh that every 4 vertices define a disconected quad
-	public ArrayMesh getQuadsMesh(int nQuads) {
+	// Generate a mesh that every 3 vertices define a disconected tri
+	public ArrayMesh getTrianglesMesh(int nTris) {
 
 		// https://docs.godotengine.org/en/stable/tutorials/3d/procedural_geometry/arraymesh.html#doc-arraymesh
 		var surfaceArray = new Godot.Collections.Array();
 		surfaceArray.Resize((int)Mesh.ArrayType.Max);
 
-		Vector3[] pos = new Vector3[nQuads*4];
-		Vector2[] uv = new Vector2[nQuads*4];
-		int[] indices = new int[nQuads*6];
-		for(int i=0;i<nQuads;i++) {
-			int i0 = i*4 + 0;
-			int i1 = i*4 + 1;
-			int i2 = i*4 + 2;
-			int i3 = i*4 + 3;
-			Vector3 off = new Vector3(i % tex_size, 0 , i / tex_size);
+		// Even though the vertex info is on the texture, still need to provide vertex info
+		// From AddSurfaceFromArrays docs: "That first vertex sub-array is always required; the others are optional."
+		Vector3[] pos = new Vector3[nTris*3];
+		for(int i=0;i<nTris;i++) {
+			int i0 = i*3 + 0;
+			int i1 = i*3 + 1;
+			int i2 = i*3 + 2;
 			
-			pos[i0] = new Vector3(0,0,0) + off;
-			pos[i1] = new Vector3(0,0,1) + off;
-			pos[i2] = new Vector3(1,0,1) + off;
-			pos[i3] = new Vector3(0,0,1) + off;
-
-			uv[i0] = new Vector2(0,0);
-			uv[i1] = new Vector2(0,1);
-			uv[i2] = new Vector2(1,1);
-			uv[i3] = new Vector2(0,1);
-
-			indices[i*6+0] = i0;
-			indices[i*6+1] = i1;
-			indices[i*6+2] = i2;
-			indices[i*6+3] = i2;
-			indices[i*6+4] = i3;
-			indices[i*6+5] = i0;
+			// those values don't matter, the values provided by the compute shader in the
+			// texture will be used instead. what could be stored here?
+			//Vector3 off = new Vector3(i % tex_size, 0 , i / tex_size);
+			//pos[i0] = new Vector3(0,0,0) + off;
+			//pos[i1] = new Vector3(0,0,1) + off;
+			//pos[i2] = new Vector3(1,0,1) + off;
+			
+			// USING COLOR FOR DEBUGGING COMPUTE SHADER EXECUTION ORDER
+			float inter = (float)i / nTris;
+			pos[i0] = new Vector3(1.0f-inter,Mathf.Abs(0.5f-inter),inter);
+			pos[i1] = new Vector3(1.0f-inter,Mathf.Abs(0.5f-inter),inter);
+			pos[i2] = new Vector3(1.0f-inter,Mathf.Abs(0.5f-inter),inter);
 		}
 		
 		// Convert Lists to arrays and assign to surface array
@@ -116,7 +113,7 @@ public partial class ProceduralGeometry : Node3D {
 			A2B10G10R10		ARRAY_NORMAL 	-
 			A2B10G10R10		ARRAY_TANGENT 	-
 			RGBA8			ARRAY_COLOR 	-
-			RG32F			UV				UV.xy
+			RG32F			UV				-
 			RG32F			UV2				-
 			RGBA16UI 		ARRAY_BONES		-
 			RGBA16UNORM 	ARRAY_WEIGHTS	-
@@ -126,9 +123,10 @@ public partial class ProceduralGeometry : Node3D {
 			RGBA32F			CUSTOM3			-
 		*/
 		surfaceArray[(int)Mesh.ArrayType.Vertex] = pos;
-		surfaceArray[(int)Mesh.ArrayType.TexUV] = uv;
-		surfaceArray[(int)Mesh.ArrayType.Index] = indices;
 
+		// Mesh without indices (each 3 vertices define a triangle)
+		// The idea is that since all this data is on the texture, the mesh doesn't need to store it
+		// And would be a waste of memory to store it twice
 		var arrMesh = new ArrayMesh();
 		arrMesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, surfaceArray,null,null);
 	
@@ -142,13 +140,17 @@ public partial class ProceduralGeometry : Node3D {
 
 	// Change this accordingly.
 	// tex_size should be choosed so that (tex_size*tex_size)/2 equals the maximum amount of vertices
-	int tex_size = 1024;
+	// Keep in mind this 'maximum amount' is always being drawed, just not visible because most of them
+	// may produce degenerate triangles reading 0's from the texture.
+	int tex_size = 2048;
 	// cube_size defines the resolution of the cube that will be calculated on compute_shader
 	// higher values means better resolution, but possibly produce also more quads, so update tex_size
-	float cube_size = 128.0f;
+	// also should be multiple of 8
+	float cube_size = 256.0f;
 	Rid current_tex;
 
 	Rid counter_buffer;
+	int pixels_per_vertex = 2; // 1 for position, 1 for normal
 
 	Texture2Drd shader_texture;
 	UniformBuffer uniformBuffer_data;
@@ -156,7 +158,8 @@ public partial class ProceduralGeometry : Node3D {
 	ComputeShaderHandler computeHandler;
 
 	public void createUniforms(int width, int height, float cubeSize) {
-		uniformBuffer_data = new UniformBuffer((uint)width, (uint)height, cubeSize, (uint)((width * height)/4));
+		int vertices = (tex_size * tex_size) / pixels_per_vertex;
+		uniformBuffer_data = new UniformBuffer((uint)width, (uint)height, cubeSize, (uint)(vertices / 3));
 		computeHandler.pushConstant = ComputeShaderHandler.GetBytesFromStruct(uniformBuffer_data);
 
 		current_tex = ComputeShaderHandler.createNewRDTexture(RD,width,height, format: RenderingDevice.DataFormat.R32G32B32A32Sfloat, usageBits: ComputeShaderHandler.UsageBitsForTexture2DRD);

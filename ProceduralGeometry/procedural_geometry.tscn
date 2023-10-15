@@ -39,6 +39,7 @@ environment = SubResource("Environment_51126")
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="WorldEnvironment"]
 transform = Transform3D(-0.866023, -0.433016, 0.250001, 0.250002, 0.0580112, 0.966506, -0.433016, 0.899517, 0.0580157, 0, 0, 0)
 shadow_enabled = true
+directional_shadow_mode = 1
 
 [node name="CameraPivot" type="Node3D" parent="."]
 script = ExtResource("2_qiusm")
