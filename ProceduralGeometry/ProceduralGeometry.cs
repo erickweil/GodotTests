@@ -79,57 +79,40 @@ public partial class ProceduralGeometry : Node3D {
 	// Generate a mesh that every 3 vertices define a disconected tri
 	public ArrayMesh getTrianglesMesh(int nTris) {
 
+		// NO NEED TO PROVIDE VERTEX INFO. JUST INDICES ARE ENOUGH, 
+		// see: https://github.com/godotengine/godot/issues/19473
+		// and: https://github.com/godotengine/godot/pull/62046
+		int[] indices = new int[nTris*3];
+		for(int i=0;i<nTris;i++) {
+			indices[i*3 + 0] = i*3 + 0;
+			indices[i*3 + 1] = i*3 + 1;
+			indices[i*3 + 2] = i*3 + 2;
+		}
+
+		// MESH WITHOUT VERTICES, ONLY INDICES ARE ENOUGH
 		// https://docs.godotengine.org/en/stable/tutorials/3d/procedural_geometry/arraymesh.html#doc-arraymesh
 		var surfaceArray = new Godot.Collections.Array();
 		surfaceArray.Resize((int)Mesh.ArrayType.Max);
 
-		// Even though the vertex info is on the texture, still need to provide vertex info
-		// From AddSurfaceFromArrays docs: "That first vertex sub-array is always required; the others are optional."
-		Vector3[] pos = new Vector3[nTris*3];
-		for(int i=0;i<nTris;i++) {
-			int i0 = i*3 + 0;
-			int i1 = i*3 + 1;
-			int i2 = i*3 + 2;
-			
-			// those values don't matter, the values provided by the compute shader in the
-			// texture will be used instead. what could be stored here?
-			//Vector3 off = new Vector3(i % tex_size, 0 , i / tex_size);
-			//pos[i0] = new Vector3(0,0,0) + off;
-			//pos[i1] = new Vector3(0,0,1) + off;
-			//pos[i2] = new Vector3(1,0,1) + off;
-			
-			// USING COLOR FOR DEBUGGING COMPUTE SHADER EXECUTION ORDER
-			float inter = (float)i / nTris;
-			pos[i0] = new Vector3(1.0f-inter,Mathf.Abs(0.5f-inter),inter);
-			pos[i1] = new Vector3(1.0f-inter,Mathf.Abs(0.5f-inter),inter);
-			pos[i2] = new Vector3(1.0f-inter,Mathf.Abs(0.5f-inter),inter);
+		// there is a bug that even using 'FlagUsesEmptyVertexArray', if you want more than 65k indices
+		// to work, you need to provide a vertex array such that the 32 bit index is used instead of 16 bit
+		// see https://github.com/godotengine/godot/issues/83446
+		if(indices.Length > 65535) {
+			// Provide a ever so slightly bigger vertex array such that the 16 bit index is not used
+			surfaceArray[(int)Mesh.ArrayType.Vertex] = new Vector3[65536 + 1];
+		} else {
+			// Provide dummy vertex array. Still needed even using 'FlagUsesEmptyVertexArray'
+			surfaceArray[(int)Mesh.ArrayType.Vertex] = new Vector3[1];
 		}
-		
-		// Convert Lists to arrays and assign to surface array
-		// https://docs.godotengine.org/en/stable/tutorials/3d/procedural_geometry/arraymesh.html#setting-up-the-arraymesh
-		// https://docs.godotengine.org/en/stable/classes/class_mesh.html#enum-mesh-arraytype
-		/*
-			RGB32F			VERTEX			POS.xyz
-			A2B10G10R10		ARRAY_NORMAL 	-
-			A2B10G10R10		ARRAY_TANGENT 	-
-			RGBA8			ARRAY_COLOR 	-
-			RG32F			UV				-
-			RG32F			UV2				-
-			RGBA16UI 		ARRAY_BONES		-
-			RGBA16UNORM 	ARRAY_WEIGHTS	-
-			RGBA32F			CUSTOM0			-
-			RGBA32F			CUSTOM1			-
-			RGBA32F			CUSTOM2			-
-			RGBA32F			CUSTOM3			-
-		*/
-		surfaceArray[(int)Mesh.ArrayType.Vertex] = pos;
 
-		// Mesh without indices (each 3 vertices define a triangle)
+		surfaceArray[(int)Mesh.ArrayType.Index] = indices;
+
 		// The idea is that since all this data is on the texture, the mesh doesn't need to store it
-		// And would be a waste of memory to store it twice
+		// And would be a waste of memory to store it twice		
+		var flags = Mesh.ArrayFormat.FlagUsesEmptyVertexArray; // NEED TO SPECIFY THAT THE VERTEX ARRAY IS EMPTY
 		var arrMesh = new ArrayMesh();
-		arrMesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, surfaceArray,null,null);
-	
+		arrMesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, surfaceArray,null,null, flags);
+
 		return arrMesh;
 	}
 
