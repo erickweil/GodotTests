@@ -77,7 +77,7 @@ float sdTorus(vec3 p, vec2 t) {
 
 float calcDe(vec3 p) {
 	//return sdTorus(p - vec3(_params.offx,_params.offy,_params.offz), vec2(0.32,0.10));
-	return sdTorus(p, vec2(0.32 - _params.offx,0.10 - _params.offz));
+	return sdTorus(p, vec2(0.12 - _params.offx,0.05 - _params.offz));
 }
 
 // The code we want to execute in each invocation

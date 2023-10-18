@@ -202,11 +202,11 @@ public partial class GravitySimulation : SubViewport {
 		texClearer.runClear(Color.Color8(0,0,0),(uint)width,(uint)height);
 
 		for(int i=0;i<steps;i++) {
-			gravityAttract.dipatchPipeline((uint)objects.Length,1,1);
+			gravityAttract.dispatchPipeline((uint)objects.Length,1,1);
 
 			// Barrier? precisa mesmo disso?
 
-			gravityIntegrate.dipatchPipeline((uint)objects.Length,1,1);
+			gravityIntegrate.dispatchPipeline((uint)objects.Length,1,1);
 		}
 
 		if(Input.IsActionJustPressed("ui_up")) {

@@ -84,7 +84,7 @@ public partial class Main : Node3D {
 
 	
 	public void computeShader() {
-		computeHandler.dipatchPipeline((uint)width*(uint)height,1,1);
+		computeHandler.dispatchPipeline((uint)width*(uint)height,1,1);
 	}
 
 	protected override void Dispose(bool disposing) {

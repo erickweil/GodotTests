@@ -87,7 +87,7 @@ public partial class ConwayGameOfLife : SubViewport {
         computeHandler.pushConstant = ComputeShaderHandler.GetBytesFromStruct(uniformBuffer_data);
 
         //for(int i = 0; i < 10; i++) {
-            computeHandler.dipatchPipeline(width+8,height+8,1);
+            computeHandler.dispatchPipeline(width+8,height+8,1);
 
             // If you want the output of a compute shader to be used as input of
             // another computer shader you'll need to add a barrier:

@@ -15,10 +15,6 @@ run/main_scene="res://ProceduralGeometry/procedural_geometry.tscn"
 config/features=PackedStringArray("4.2", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 
-[display]
-
-window/size/mode=2
-
 [dotnet]
 
 project/assembly_name="GodotTests"

@@ -161,7 +161,7 @@ public class ComputeShaderHandler : IDisposable {
 		uniformSets[set].create(RD,shader,(uint)set);
 	}
 
-	public void dipatchPipeline(uint xInvocations, uint yInvocations, uint zInvocations) {
+	public void dispatchPipeline(uint xInvocations, uint yInvocations, uint zInvocations) {
 		if(RD.ComputePipelineIsValid(pipeline) == false) {
 			throw new InvalidDataException("Pipeline inválido");
 		}
@@ -190,7 +190,7 @@ public class ComputeShaderHandler : IDisposable {
 
 	public void submitAndSyncPipeline(uint xInvocations, uint yInvocations, uint zInvocations) {
 		// Submit to GPU and wait for sync
-		dipatchPipeline(xInvocations, yInvocations, zInvocations);
+		dispatchPipeline(xInvocations, yInvocations, zInvocations);
 
 		if(isLocalRenderingDevice) {
 			/*

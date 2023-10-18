@@ -41,7 +41,7 @@ public class ComputeTexClear : IDisposable {
 		var data = new ParamsBuffer(width,height,color);
         computeHandler.pushConstant = ComputeShaderHandler.GetBytesFromStruct(data);
 
-		computeHandler.dipatchPipeline((uint)width+8,(uint)height+8,1);
+		computeHandler.dispatchPipeline((uint)width+8,(uint)height+8,1);
 	}
 
 	public void Dispose() {
