@@ -12,7 +12,7 @@ config_version=5
 
 config/name="GodotTests"
 run/main_scene="res://ProceduralGeometry/procedural_geometry.tscn"
-config/features=PackedStringArray("4.2", "C#", "Forward Plus")
+config/features=PackedStringArray("4.3", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 
 [dotnet]
