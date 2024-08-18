@@ -15,6 +15,8 @@ public partial class ComputePipeline : SubViewport {
 	RenderingDevice RD;
 
 	ComputeShaderHandler computeHandler;
+    UniformSetStore uniformSet;
+    Rid computeShader;
 	float[] input;
 	Rid input_buffer;
 
@@ -28,7 +30,8 @@ public partial class ComputePipeline : SubViewport {
 		RD = RenderingServer.GetRenderingDevice();
 
 		computeHandler = new ComputeShaderHandler(false, RD);
-		computeHandler.loadShader("res://RenderingPipeline/compute_pipeline.glsl",8,1,1);
+		computeShader = ComputeShaderHandler.loadShader(RD, "res://RenderingPipeline/compute_pipeline.glsl");
+        computeHandler.setShader(computeShader,8,1,1);
 
 
 		// Carregar Shader
@@ -100,7 +103,9 @@ public partial class ComputePipeline : SubViewport {
 			blend
 		);
 
-		computeHandler.putBufferUniform(color_buf,0,0);
+        uniformSet = new UniformSetStore(RD, computeShader);
+		uniformSet.putBufferUniform(color_buf,0,0);
+        uniformSet.createAllUniformSets();
 		// Defining a compute pipeline
 		computeHandler.createPipeline();
 
@@ -121,7 +126,7 @@ public partial class ComputePipeline : SubViewport {
 	{
 		if(!Input.IsActionJustPressed("ui_up")) return;
 
-		//computeHandler.dipatchPipeline(8,1,1);
+		//computeHandler.dipatchPipeline(uniformSet, 8,1,1);
 		
 		// handle resizing
 		if(!RD.FramebufferIsValid(framebuffer)) {

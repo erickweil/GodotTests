@@ -5,6 +5,8 @@ using System.Runtime.InteropServices;
 public class ComputeTexClear : IDisposable {
 	// Called when the node enters the scene tree for the first time.
 	ComputeShaderHandler computeHandler;
+    UniformSetStore uniformSetStore;
+    Rid shader;
 
 	[StructLayout(LayoutKind.Sequential)]
 	struct ParamsBuffer {
@@ -26,22 +28,24 @@ public class ComputeTexClear : IDisposable {
 	
 	public ComputeTexClear(bool isLocal, RenderingDevice rd) {
 		computeHandler = new ComputeShaderHandler(isLocal, rd);
-		computeHandler.loadShader("res://HelloComputeShader/compute_clear.glsl",8,8,1);
+		shader = ComputeShaderHandler.loadShader(rd, "res://HelloComputeShader/compute_clear.glsl");
+        computeHandler.setShader(shader,8,8,1);
 	}
 
 	public void assignTexture(Rid tex) {
-		computeHandler.putBufferUniform(tex, 0, 0, uniformType: RenderingDevice.UniformType.Image);
-
+        uniformSetStore = new UniformSetStore(computeHandler.RD, shader);
+		uniformSetStore.putBufferUniform(tex, 0, 0, uniformType: RenderingDevice.UniformType.Image);
+        uniformSetStore.createAllUniformSets();
 
 		// Defining a compute pipeline
 		computeHandler.createPipeline();
 	}
 	
-	public void runClear(Color color, uint width, uint height) {
-		var data = new ParamsBuffer(width,height,color);
-        computeHandler.pushConstant = ComputeShaderHandler.GetBytesFromStruct(data);
+	public void runClear(Color color, int width, int height) {
+		var data = new ParamsBuffer((uint)width,(uint)height,color);
+        uniformSetStore.pushConstant = ComputeShaderHandler.GetBytesFromStruct(data);
 
-		computeHandler.dispatchPipeline((uint)width+8,(uint)height+8,1);
+		computeHandler.dispatchPipeline(uniformSetStore, width+8, height+8, 1);
 	}
 
 	public void Dispose() {

@@ -4,31 +4,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 
+// https://github.com/erickweil/GodotTests/blob/v4.2-beta1/HelloComputeShader/ComputeShaderHandler.cs
 public class ComputeShaderHandler : IDisposable {
-	public class UniformSet {
-		Godot.Collections.Array<RDUniform> uniformList;
-		public Rid rid;
-
-		public UniformSet() {
-			uniformList = new Godot.Collections.Array<RDUniform>();
-		}
-
-		public void addUniform(RDUniform uniform) {
-			uniformList.Add(uniform);
-		}
-
-		public void create(RenderingDevice rd, Rid shader, uint shaderSet) {
-			rid = rd.UniformSetCreate(uniformList, shader, shaderSet);
-		}
-	}
 	public RenderingDevice RD;
 	private bool isLocalRenderingDevice;
-	public List<UniformSet> uniformSets;
-
 	Rid shader;
 	uint local_size_x, local_size_y, local_size_z;
 	Rid pipeline;
-	public byte[] pushConstant;
+	
 
 	public ComputeShaderHandler(bool local, RenderingDevice rd = null) {
 		isLocalRenderingDevice = local;
@@ -36,6 +19,7 @@ public class ComputeShaderHandler : IDisposable {
 			if(isLocalRenderingDevice) {
 				this.RD = RenderingServer.CreateLocalRenderingDevice();
 			} else {
+                // DEPOIS: Quando atualizar pra Godot 4.3, vai mudar tudo isso de multiplas threads e etc...
 				// Ver depois questões de multithreading que pode dar problema
 				// """ 
 				// 		For clarity, this is only needed for compute code that needs to synchronize with the main RenderingDevice. 
@@ -47,89 +31,14 @@ public class ComputeShaderHandler : IDisposable {
 		} else {
 			this.RD = rd;
 		}
-
-		uniformSets = new List<UniformSet>();
 	}
-
-	/*
-	We can load the newly created shader file compute_example.glsl and create a precompiled version of it using this:
-	*/
-	public void loadShader(string filePath, uint local_size_x, uint local_size_y, uint local_size_z) {
+	
+	public void setShader(Rid shader, uint local_size_x, uint local_size_y, uint local_size_z) {
 		this.local_size_x = local_size_x;
 		this.local_size_y = local_size_y;
 		this.local_size_z = local_size_z;
-		// https://docs.godotengine.org/en/stable/classes/class_rdshaderfile.html
-		var shaderFile = GD.Load<RDShaderFile>(filePath);
 
-		if(shaderFile.BaseError != "") {
-			throw new InvalidDataException("Não foi possível carregar o shader:"+shaderFile.BaseError);
-		}
-
-		// https://docs.godotengine.org/en/stable/classes/class_rdshaderspirv.html#class-rdshaderspirv
-		var shaderSpirV = shaderFile.GetSpirV();
-
-		if(shaderSpirV.CompileErrorCompute != "") {
-			throw new InvalidDataException("Não foi possível compilar o shader:"+shaderSpirV.CompileErrorCompute);
-		}
-
-		shader = RD.ShaderCreateFromSpirV(shaderSpirV);
-	}
-
-	/*
-	With the buffer in place we need to tell the rendering device to use this buffer. 
-	To do that we will need to create a uniform (like in normal shaders) and assign it to a
-		uniform set which we can pass to our shader later.
-	*/
-	/* https://docs.godotengine.org/en/stable/classes/class_renderingdevice.html#enum-renderingdevice-uniformtype
-		enum UniformType:
-		UniformType UNIFORM_TYPE_SAMPLER = 0
-				Sampler uniform. TODO: Difference between sampler and texture uniform
-		UniformType UNIFORM_TYPE_SAMPLER_WITH_TEXTURE = 1
-				Sampler uniform with a texture.
-		UniformType UNIFORM_TYPE_TEXTURE = 2
-				Texture uniform.
-		UniformType UNIFORM_TYPE_IMAGE = 3
-				Image uniform. TODO: Difference between texture and image uniform
-		UniformType UNIFORM_TYPE_TEXTURE_BUFFER = 4
-				Texture buffer uniform. TODO: Difference between texture and texture buffe uniformr
-		UniformType UNIFORM_TYPE_SAMPLER_WITH_TEXTURE_BUFFER = 5
-				Sampler uniform with a texture buffer. TODO: Difference between texture and texture buffer uniform
-		UniformType UNIFORM_TYPE_IMAGE_BUFFER = 6
-				Image buffer uniform. TODO: Difference between texture and image uniforms
-		UniformType UNIFORM_TYPE_UNIFORM_BUFFER = 7
-				Uniform buffer uniform.
-		UniformType UNIFORM_TYPE_STORAGE_BUFFER = 8
-				Storage buffer uniform.
-		UniformType UNIFORM_TYPE_INPUT_ATTACHMENT = 9
-				Input attachment uniform.
-		UniformType UNIFORM_TYPE_MAX = 10
-				Represents the size of the UniformType enum.
-	*/
-	public void putBufferUniform(Rid buffer, int set, int binding, 
-	RenderingDevice.UniformType uniformType = RenderingDevice.UniformType.StorageBuffer) {
-		// Create a uniform to assign the buffer to the rendering device
-		var uniform = new RDUniform
-		{
-			UniformType = uniformType,
-			Binding = binding
-		};
-		uniform.AddId(buffer);
-
-		if(uniformSets.Count == set) {
-			uniformSets.Add(new UniformSet());
-		}
-		UniformSet uniformSet = uniformSets[set];
-
-		uniformSet.addUniform(uniform);
-	}
-
-	public void resetUniformSets() {
-		for(int i=0;i<uniformSets.Count;i++) {
-			if(RD.UniformSetIsValid(uniformSets[i].rid))
-			RD.FreeRid(uniformSets[i].rid);
-		}
-
-		uniformSets = new List<UniformSet>();
+		this.shader = shader;
 	}
 
 	/* Defining a compute pipeline
@@ -151,24 +60,33 @@ public class ComputeShaderHandler : IDisposable {
 	public void createPipeline() {
 		// Create a compute pipeline
 		pipeline = RD.ComputePipelineCreate(shader);
-
-		for(int i=0;i<uniformSets.Count;i++) {
-			uniformSets[i].create(RD,shader,(uint)i);
-		}
 	}
 
-	public void createUniformSet(int set) {
-		uniformSets[set].create(RD,shader,(uint)set);
+	
+	/*//TESTE REALIZAR VÁRIOS DISPATCH NO MESMO COMPUTE LIST
+	//Não fez diferença na performance?
+	public long computeList;
+	public void preDispatchPipeline() {
+		computeList = RD.ComputeListBegin();
+		RD.ComputeListBindComputePipeline(computeList, pipeline);
 	}
 
-	public void dispatchPipeline(uint xInvocations, uint yInvocations, uint zInvocations) {
+	public void postDispatchPipeline() {
+		RD.ComputeListEnd();
+	}*/
+
+	public void dispatchPipeline(UniformSetStore uniforms,int xInvocations, int yInvocations, int zInvocations) {
 		if(RD.ComputePipelineIsValid(pipeline) == false) {
 			throw new InvalidDataException("Pipeline inválido");
 		}
 		// Deveria dar erro caso a conta não bater?
-		uint xGroups = xInvocations / local_size_x;
-		uint yGroups = yInvocations / local_size_y;
-		uint zGroups = zInvocations / local_size_z;
+		uint xGroups = (uint)Mathf.Ceil((float)xInvocations / local_size_x);
+		uint yGroups = (uint)Mathf.Ceil((float)yInvocations / local_size_y);
+		uint zGroups = (uint)Mathf.Ceil((float)zInvocations / local_size_z);
+
+		//GD.Print("X:",xGroups," Y:",yGroups," Z:",zGroups);
+		List<UniformSetStore.UniformSet> uniformSets = uniforms.uniformSets;
+		byte[] pushConstant = uniforms.pushConstant;
 
 		var computeList = RD.ComputeListBegin();
 		// Se quiser pode repetir o dispatch
@@ -188,9 +106,9 @@ public class ComputeShaderHandler : IDisposable {
 		RD.ComputeListEnd();
 	}
 
-	public void submitAndSyncPipeline(uint xInvocations, uint yInvocations, uint zInvocations) {
+	public void submitAndSyncPipeline(UniformSetStore uniforms,int xInvocations, int yInvocations, int zInvocations) {
 		// Submit to GPU and wait for sync
-		dispatchPipeline(xInvocations, yInvocations, zInvocations);
+		dispatchPipeline(uniforms, xInvocations, yInvocations, zInvocations);
 
 		if(isLocalRenderingDevice) {
 			/*
@@ -207,18 +125,35 @@ public class ComputeShaderHandler : IDisposable {
 	public void Dispose()
 	{
 		GD.Print("Dispose ComputeShaderHandler");
-		for(int i = 0;i < uniformSets.Count; i++) {
-			if(RD.UniformSetIsValid(uniformSets[i].rid))
-			RD.FreeRid(uniformSets[i].rid);
-		}
 		RD.FreeRid(pipeline);
-		RD.FreeRid(shader);
+		RD = null;
 	}
 
 	// =====================================================
 	// Helpers
 	// =====================================================
 	// https://github.com/godotengine/godot-demo-projects/tree/65b34f81920752a382d14d544aa451de46b32a07/misc/compute_shader_heightmap
+
+	/*
+	We can load the newly created shader file compute_example.glsl and create a precompiled version of it using this:
+	*/
+	public static Rid loadShader(RenderingDevice RD, string filePath) {
+		// https://docs.godotengine.org/en/stable/classes/class_rdshaderfile.html
+		var shaderFile = GD.Load<RDShaderFile>(filePath);
+
+		if(shaderFile.BaseError != "") {
+			throw new InvalidDataException("Não foi possível carregar o shader:"+shaderFile.BaseError);
+		}
+
+		// https://docs.godotengine.org/en/stable/classes/class_rdshaderspirv.html#class-rdshaderspirv
+		var shaderSpirV = shaderFile.GetSpirV();
+
+		if(shaderSpirV.CompileErrorCompute != "") {
+			throw new InvalidDataException("Não foi possível compilar o shader:"+shaderSpirV.CompileErrorCompute);
+		}
+
+		return RD.ShaderCreateFromSpirV(shaderSpirV);
+	}
 
 	public const RenderingDevice.TextureUsageBits UsageBitsForTexture2DRD = 
 		  RenderingDevice.TextureUsageBits.SamplingBit
@@ -269,7 +204,7 @@ public class ComputeShaderHandler : IDisposable {
 	}
 
 	public static Rid createStructArrayBuffer<T>(RenderingDevice rd,T[] input, int elementSize) {
-		var inputBytes = GetBytesFromArray(input,elementSize);
+		var inputBytes = GetBytesFromStructArray(input,elementSize, input.Length);
 
 		// Create a storage buffer that can hold our float values.
 		// Each float has 4 bytes (32 bit) so 10 x 4 = 40 bytes
@@ -290,8 +225,15 @@ public class ComputeShaderHandler : IDisposable {
 		rd.BufferUpdate(buffer,0,(uint)inputBytes.Length,inputBytes);
 	}
 
-	public static void updateBufferFromArray<T>(RenderingDevice rd, Rid buffer, T[] input, int elementSize) {
-		var inputBytes = GetBytesFromArray(input,elementSize);
+	public static void updateBufferFromArray<T>(RenderingDevice rd, Rid buffer, T[] input, int elementSize, int lengthToCopy) {
+		var inputBytes = new byte[lengthToCopy * elementSize];
+		Buffer.BlockCopy(input, 0, inputBytes, 0, inputBytes.Length);
+		
+		rd.BufferUpdate(buffer,0,(uint)inputBytes.Length,inputBytes);
+	}
+
+	public static void updateBufferFromStructArray<T>(RenderingDevice rd, Rid buffer, T[] input, int elementSize, int lengthToCopy) {
+		var inputBytes = GetBytesFromStructArray(input,elementSize,lengthToCopy);
 		
 		rd.BufferUpdate(buffer,0,(uint)inputBytes.Length,inputBytes);
 	}
@@ -319,11 +261,11 @@ public class ComputeShaderHandler : IDisposable {
 		return arr;
 	}
 
-	public static byte[] GetBytesFromArray<T>(T[] input, int elementSize) {
-		var inputBytes = new byte[input.Length * elementSize];
+	public static byte[] GetBytesFromStructArray<T>(T[] input, int elementSize, int lengthToCopy) {
+		var inputBytes = new byte[lengthToCopy * elementSize];
 		
 		// Não funciona BlockCopy https://stackoverflow.com/questions/33181945/blockcopy-a-class-getting-object-must-be-an-array-of-primitives
-		for(int i = 0;i< input.Length;i++) {
+		for(int i = 0;i< lengthToCopy;i++) {
 			byte[] elemBytes = GetBytesFromStruct(input[i]);
 
 			Buffer.BlockCopy(elemBytes, 0, inputBytes, i * elementSize, elemBytes.Length);
@@ -332,7 +274,7 @@ public class ComputeShaderHandler : IDisposable {
 		return inputBytes;
 	}
 
-	public float[] readFloatBuffer(Rid buffer) {
+	public static float[] readFloatBuffer(RenderingDevice RD, Rid buffer) {
 		var outputBytes = RD.BufferGetData(buffer);
 		var output = new float[outputBytes.Length / sizeof(float)];
 		Buffer.BlockCopy(outputBytes, 0, output, 0, outputBytes.Length);
@@ -340,13 +282,13 @@ public class ComputeShaderHandler : IDisposable {
 		return output;
 	}
 
-	public void readArrayBuffer<T>(Rid buffer,T[] output) {
-		var outputBytes = RD.BufferGetData(buffer);
+	public static void readArrayBuffer<T>(RenderingDevice RD,Rid buffer,T[] output, int elementSize, int lengthToRead) {
+		var outputBytes = RD.BufferGetData(buffer,0,(uint)(elementSize * lengthToRead));
 		//var output = new float[outputBytes.Length / sizeof(float)];
 		Buffer.BlockCopy(outputBytes, 0, output, 0, outputBytes.Length);
 	}
 
-	public void readStructArrayBuffer<T>(Rid buffer,T[] output) where T : struct {
+	public static void readStructArrayBuffer<T>(RenderingDevice RD,Rid buffer,T[] output) where T : struct {
 		byte[] outputBytes = RD.BufferGetData(buffer);
 		ReadOnlySpan<T> span = MemoryMarshal.Cast<byte,T>(outputBytes);
 		for(int i = 0;i< output.Length;i++) {

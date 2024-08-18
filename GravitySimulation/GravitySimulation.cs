@@ -8,7 +8,11 @@ public partial class GravitySimulation : SubViewport {
     // Called when the node enters the scene tree for the first time.
 	RenderingDevice RD;
 	ComputeShaderHandler gravityAttract;
+    Rid shaderAttract;
+    UniformSetStore uniformSetAttract;
 	ComputeShaderHandler gravityIntegrate;
+    Rid shaderIntegrate;
+    UniformSetStore uniformSetIntegrate;
 	ComputeTexClear texClearer;
 	GObj[] objects;
 	Rid objects_buffer;
@@ -89,10 +93,12 @@ public partial class GravitySimulation : SubViewport {
 	public void initializeCompute() {
 		RD = RenderingServer.GetRenderingDevice();
 		gravityAttract = new ComputeShaderHandler(false,RD);
-		gravityAttract.loadShader("res://GravitySimulation/compute_gravity_attract.glsl",64,1,1);
+        shaderAttract = ComputeShaderHandler.loadShader(RD, "res://GravitySimulation/compute_gravity_attract.glsl");
+        gravityAttract.setShader(shaderAttract, 64, 1, 1);
 
 		gravityIntegrate = new ComputeShaderHandler(false,RD);
-		gravityIntegrate.loadShader("res://GravitySimulation/compute_gravity_integrate.glsl",64,1,1);
+        shaderIntegrate = ComputeShaderHandler.loadShader(RD, "res://GravitySimulation/compute_gravity_integrate.glsl");
+        gravityIntegrate.setShader(shaderIntegrate, 64, 1, 1);
 
 		var tex = GetTexture();
 
@@ -144,21 +150,27 @@ public partial class GravitySimulation : SubViewport {
 	}
 
 	public void setupAttract() {
-		gravityAttract.putBufferUniform(objects_buffer, 0, 0, RenderingDevice.UniformType.StorageBuffer);
+        uniformSetAttract = new UniformSetStore(RD, shaderAttract);
+		uniformSetAttract.putBufferUniform(objects_buffer, 0, 0, RenderingDevice.UniformType.StorageBuffer);
 
-        gravityAttract.pushConstant = ComputeShaderHandler.GetBytesFromStruct(params_data);
+        uniformSetAttract.pushConstant = ComputeShaderHandler.GetBytesFromStruct(params_data);
+
+        uniformSetAttract.createAllUniformSets();
 
 		gravityAttract.createPipeline();
 	}
 
 	public void setupIntegrate(ViewportTexture tex) {
-		gravityIntegrate.putBufferUniform(objects_buffer, 0, 0, RenderingDevice.UniformType.StorageBuffer);
+        uniformSetIntegrate = new UniformSetStore(RD, shaderIntegrate);
+		uniformSetIntegrate.putBufferUniform(objects_buffer, 0, 0, RenderingDevice.UniformType.StorageBuffer);
 
 		//output_tex = ComputeShaderHandler.createNewRDTexture(RD,objects.Length,GObj.NUMBYTES);
         output_tex = RenderingServer.TextureGetRdTexture(tex.GetRid());
-        gravityIntegrate.putBufferUniform(output_tex, 0, 1, uniformType: RenderingDevice.UniformType.Image);
+        uniformSetIntegrate.putBufferUniform(output_tex, 0, 1, uniformType: RenderingDevice.UniformType.Image);
 
-        gravityIntegrate.pushConstant = ComputeShaderHandler.GetBytesFromStruct(params_data);
+        uniformSetIntegrate.pushConstant = ComputeShaderHandler.GetBytesFromStruct(params_data);
+
+        uniformSetIntegrate.createAllUniformSets();
 
 		gravityIntegrate.createPipeline();
 	}
@@ -195,18 +207,18 @@ public partial class GravitySimulation : SubViewport {
 
 		byte[] pushConstant = ComputeShaderHandler.GetBytesFromStruct(params_data);
 
-		gravityAttract.pushConstant = pushConstant;
-		gravityIntegrate.pushConstant = pushConstant;
+		uniformSetAttract.pushConstant = pushConstant;
+		uniformSetIntegrate.pushConstant = pushConstant;
 
 		// Limpa a textura só uma vez
-		texClearer.runClear(Color.Color8(0,0,0),(uint)width,(uint)height);
+		texClearer.runClear(Color.Color8(0,0,0),width,height);
 
 		for(int i=0;i<steps;i++) {
-			gravityAttract.dispatchPipeline((uint)objects.Length,1,1);
+			gravityAttract.dispatchPipeline(uniformSetAttract, objects.Length,1,1);
 
 			// Barrier? precisa mesmo disso?
 
-			gravityIntegrate.dispatchPipeline((uint)objects.Length,1,1);
+			gravityIntegrate.dispatchPipeline(uniformSetIntegrate, objects.Length,1,1);
 		}
 
 		if(Input.IsActionJustPressed("ui_up")) {
@@ -221,7 +233,7 @@ public partial class GravitySimulation : SubViewport {
 		
 		// Read back the data from the buffers
 		GObj[] output = new GObj[objects.Length];
-		gravityIntegrate.readStructArrayBuffer(objects_buffer,output);
+		ComputeShaderHandler.readStructArrayBuffer(RD, objects_buffer, output);
 		//var output =  computeHandler.readFloatBuffer(input_buffer);
 
 		//GD.Print("Input: ", string.Join(", ", input));

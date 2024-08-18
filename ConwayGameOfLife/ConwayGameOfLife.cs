@@ -11,6 +11,8 @@ public partial class ConwayGameOfLife : SubViewport {
 
     RenderingDevice RD;
     ComputeShaderHandler computeHandler;
+    Rid shader;
+    UniformSetStore uniformSet;
     struct UniformBuffer {
         public uint width;
 	    public uint height;
@@ -31,14 +33,12 @@ public partial class ConwayGameOfLife : SubViewport {
     public override void _Ready() {
         RD = RenderingServer.GetRenderingDevice();
         computeHandler = new ComputeShaderHandler(false,RD);
-		computeHandler.loadShader("res://ConwayGameOfLife/compute_game_of_life.glsl",8,8,1);
+		shader = ComputeShaderHandler.loadShader(RD, "res://ConwayGameOfLife/compute_game_of_life.glsl");
+        computeHandler.setShader(shader,8,8,1);
 
         ViewportTexture tex = GetTexture();
 
-        uniformBuffer_data = new UniformBuffer((uint)tex.GetWidth(), (uint)tex.GetHeight(), 0, 0);
-
-        computeHandler.pushConstant = ComputeShaderHandler.GetBytesFromStruct(uniformBuffer_data);
-
+        uniformSet = new UniformSetStore(RD, shader);
         createUniforms(tex);
 
         
@@ -47,11 +47,17 @@ public partial class ConwayGameOfLife : SubViewport {
 	}
 
     public void createUniforms(ViewportTexture tex) {
+        uniformBuffer_data = new UniformBuffer((uint)tex.GetWidth(), (uint)tex.GetHeight(), 0, 0);
+
+        uniformSet.pushConstant = ComputeShaderHandler.GetBytesFromStruct(uniformBuffer_data);
+
         computeTex = ComputeShaderHandler.createNewRDTexture(RD,tex.GetWidth(),tex.GetHeight());
-        computeHandler.putBufferUniform(computeTex, 0, 0, uniformType: RenderingDevice.UniformType.Image);
+        uniformSet.putBufferUniform(computeTex, 0, 0, uniformType: RenderingDevice.UniformType.Image);
 
         vptex = RenderingServer.TextureGetRdTexture(GetTexture().GetRid());
-        computeHandler.putBufferUniform(vptex, 0, 1, uniformType: RenderingDevice.UniformType.Image);
+        uniformSet.putBufferUniform(vptex, 0, 1, uniformType: RenderingDevice.UniformType.Image);
+
+        uniformSet.createAllUniformSets();
     }
 
     public override void _Process(double delta)
@@ -62,32 +68,32 @@ public partial class ConwayGameOfLife : SubViewport {
 
 
         ViewportTexture tex = GetTexture();
-        uint width = (uint)tex.GetWidth();
-        uint height = (uint)tex.GetHeight();
+        int width = tex.GetWidth();
+        int height = tex.GetHeight();
 
-        if(!RD.UniformSetIsValid(computeHandler.uniformSets[0].rid)) {
+        if(!RD.UniformSetIsValid(uniformSet.uniformSets[0].rid)) {
             GD.Print("Re-doing uniform set");
 
-            computeHandler.resetUniformSets();
+            uniformSet.resetUniformSets();
 
             RD.FreeRid(computeTex);
 
             createUniforms(tex);
 
-            computeHandler.createUniformSet(0);
+            uniformSet.createUniformSet(0);
         }
 
         Vector2 pos = GetMousePosition();
 
         //GD.Print(pos);
-        uniformBuffer_data.width = width;
-        uniformBuffer_data.height = height;
-        uniformBuffer_data.mousex = (uint)Math.Clamp((int)pos.X,0,(int)width);
-        uniformBuffer_data.mousey = (uint)Math.Clamp((int)pos.Y,0,(int)height);
-        computeHandler.pushConstant = ComputeShaderHandler.GetBytesFromStruct(uniformBuffer_data);
+        uniformBuffer_data.width = (uint)width;
+        uniformBuffer_data.height = (uint)height;
+        uniformBuffer_data.mousex = (uint)Math.Clamp((int)pos.X, 0, width);
+        uniformBuffer_data.mousey = (uint)Math.Clamp((int)pos.Y, 0, height);
+        uniformSet.pushConstant = ComputeShaderHandler.GetBytesFromStruct(uniformBuffer_data);
 
         //for(int i = 0; i < 10; i++) {
-            computeHandler.dispatchPipeline(width+8,height+8,1);
+            computeHandler.dispatchPipeline(uniformSet, width+8,height+8,1);
 
             // If you want the output of a compute shader to be used as input of
             // another computer shader you'll need to add a barrier:

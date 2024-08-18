@@ -20,6 +20,8 @@ using System;
 public partial class Main : Node3D {
 	// Called when the node enters the scene tree for the first time.
 	ComputeShaderHandler computeHandler;
+	Rid shader;
+	UniformSetStore uniformSet;
 	int width, height;
 	float[] input;
 	Rid input_buffer;
@@ -30,15 +32,17 @@ public partial class Main : Node3D {
 	// https://github.com/godotengine/godot/pull/79696
 	public void initializeCompute() {
 		computeHandler = new ComputeShaderHandler(false);
-		computeHandler.loadShader("res://HelloComputeShader/compute_example.glsl",64,1,1);
+		shader = ComputeShaderHandler.loadShader(computeHandler.RD, "res://HelloComputeShader/compute_example.glsl");
+		computeHandler.setShader(shader,64,1,1);
 
 		// Prepare our data. We use floats in the shader, so we need 32 bit.
 		width = 128;
 		height = 128;
 		input = new float[width * height];
 		input_buffer = ComputeShaderHandler.createArrayBuffer(computeHandler.RD,input,sizeof(float));
-
-		computeHandler.putBufferUniform(input_buffer, 0, 0, RenderingDevice.UniformType.StorageBuffer);
+		uniformSet = new UniformSetStore(computeHandler.RD, shader);
+		uniformSet.putBufferUniform(input_buffer, 0, 0, RenderingDevice.UniformType.StorageBuffer);
+		uniformSet.createAllUniformSets();
 
 		// Defining a compute pipeline
 		computeHandler.createPipeline();
@@ -68,7 +72,7 @@ public partial class Main : Node3D {
 		ulong startTime = startMeasure();
 		
 		// Read back the data from the buffers
-		var output =  computeHandler.readFloatBuffer(input_buffer);
+		var output =  ComputeShaderHandler.readFloatBuffer(computeHandler.RD, input_buffer);
 
 		//GD.Print("Input: ", string.Join(", ", input));
 		//GD.Print("Output: ", string.Join(", ", output));
@@ -84,7 +88,7 @@ public partial class Main : Node3D {
 
 	
 	public void computeShader() {
-		computeHandler.dispatchPipeline((uint)width*(uint)height,1,1);
+		computeHandler.dispatchPipeline(uniformSet, width*height,1,1);
 	}
 
 	protected override void Dispose(bool disposing) {

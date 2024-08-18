@@ -47,6 +47,7 @@ public partial class ProceduralGeometry : Node3D {
 		shader_texture = new Texture2Drd();
 		material.SetShaderParameter("image", shader_texture);
 
+		meshInstance.CustomAabb = new Aabb(new Vector3(0,0,0), new Vector3(10,10,10));
 		if(resizeBasedOnCounter) {
 			int tris = 1024; // start with small mesh
 			meshInstance.Mesh = getTrianglesMesh(tris);
@@ -137,7 +138,7 @@ public partial class ProceduralGeometry : Node3D {
 		var surfaceArray = new Godot.Collections.Array();
 		surfaceArray.Resize((int)Mesh.ArrayType.Max);
 
-		// there is a bug that even using 'FlagUsesEmptyVertexArray', if you want more than 65k indices
+		/*// there is a bug that even using 'FlagUsesEmptyVertexArray', if you want more than 65k indices
 		// to work, you need to provide a vertex array such that the 32 bit index is used instead of 16 bit
 		// see https://github.com/godotengine/godot/issues/83446
 		if(indices.Length > 65535) {
@@ -149,7 +150,7 @@ public partial class ProceduralGeometry : Node3D {
 		} else {
 			// Provide dummy vertex array. Still needed even using 'FlagUsesEmptyVertexArray'
 			surfaceArray[(int)Mesh.ArrayType.Vertex] = new Vector3[1];
-		}
+		}*/
 
 		surfaceArray[(int)Mesh.ArrayType.Index] = indices;
 
@@ -192,6 +193,8 @@ public partial class ProceduralGeometry : Node3D {
 	int counter_lastValue;
 	int pixels_per_vertex = 2; // 1 for position, 1 for normal
 
+	Rid shader;
+	UniformSetStore uniformSet;
 	Texture2Drd shader_texture;
 	UniformBuffer uniformBuffer_data;
 	RenderingDevice RD;
@@ -199,27 +202,31 @@ public partial class ProceduralGeometry : Node3D {
 
 	public void createUniforms(int width, int height, float cubeSize) {
 		int vertices = (tex_size * tex_size) / pixels_per_vertex;
+		uniformSet = new UniformSetStore(RD, shader);
 		uniformBuffer_data = new UniformBuffer((uint)width, (uint)height, cubeSize, (uint)(vertices / 3));
-		computeHandler.pushConstant = ComputeShaderHandler.GetBytesFromStruct(uniformBuffer_data);
+		uniformSet.pushConstant = ComputeShaderHandler.GetBytesFromStruct(uniformBuffer_data);
 
 		current_tex = ComputeShaderHandler.createNewRDTexture(RD,width,height, format: RenderingDevice.DataFormat.R32G32B32A32Sfloat, usageBits: ComputeShaderHandler.UsageBitsForTexture2DRD);
-		computeHandler.putBufferUniform(current_tex, 0, 0, uniformType: RenderingDevice.UniformType.Image);
+		uniformSet.putBufferUniform(current_tex, 0, 0, uniformType: RenderingDevice.UniformType.Image);
 
 		uint[] input = new uint[1] {0};
 		counter_buffer = ComputeShaderHandler.createArrayBuffer(computeHandler.RD,input,sizeof(uint));
-		computeHandler.putBufferUniform(counter_buffer, 0, 1, RenderingDevice.UniformType.StorageBuffer);
+		uniformSet.putBufferUniform(counter_buffer, 0, 1, RenderingDevice.UniformType.StorageBuffer);
+
+		uniformSet.createAllUniformSets();
 	}
 
 	public void computeInit() {
 		RD = RenderingServer.GetRenderingDevice();
-		computeHandler = new ComputeShaderHandler(false,RD);
-		computeHandler.loadShader("res://ProceduralGeometry/procedural_geometry.glsl",8,8,8);
 
-		createUniforms(tex_size,tex_size,cube_size);
+		shader = ComputeShaderHandler.loadShader(RD,"res://ProceduralGeometry/procedural_geometry.glsl");
 		
+		computeHandler = new ComputeShaderHandler(false,RD);
+		computeHandler.setShader(shader, 8, 8, 8);
 		// Defining a compute pipeline
 		computeHandler.createPipeline();
 
+		createUniforms(tex_size,tex_size,cube_size);
 
 		// Run the first time
 		computeProcess();
@@ -228,7 +235,7 @@ public partial class ProceduralGeometry : Node3D {
 	public void computeProcess() {
 		ulong startTime = Time.GetTicksUsec();
 
-		if(!RD.UniformSetIsValid(computeHandler.uniformSets[0].rid)) {
+		if(!RD.UniformSetIsValid(uniformSet.uniformSets[0].rid)) {
 			GD.PrintErr("Uniform set invalid");
 			return;
 		}
@@ -236,21 +243,21 @@ public partial class ProceduralGeometry : Node3D {
 		uniformBuffer_data.offx = mouse_off.X;
 		uniformBuffer_data.offy = mouse_off.Y;
 		uniformBuffer_data.offz = mouse_off.Z;
-		computeHandler.pushConstant = ComputeShaderHandler.GetBytesFromStruct(uniformBuffer_data);
+		uniformSet.pushConstant = ComputeShaderHandler.GetBytesFromStruct(uniformBuffer_data);
 
 		// Clear the texture
 		RD.TextureClear(current_tex, new Color(0,0,0,0), 0, 1, 0, 1);
 
 		// Resetar counter
 		uint[] input = new uint[1] {0};
-		ComputeShaderHandler.updateBufferFromArray(computeHandler.RD, counter_buffer,input,sizeof(uint));
+		ComputeShaderHandler.updateBufferFromArray(computeHandler.RD, counter_buffer,input,sizeof(uint), 1);
 
-		uint invocations = (uint)(int)cube_size;
-		computeHandler.dispatchPipeline(invocations,invocations,invocations);
+		int invocations = (int)cube_size;
+		computeHandler.dispatchPipeline(uniformSet, invocations,invocations,invocations);
 
 		if(resizeBasedOnCounter) {
 			// Read counter buffer to know if the mesh needs resizing
-			computeHandler.readArrayBuffer<uint>(counter_buffer, input);
+			ComputeShaderHandler.readArrayBuffer<uint>(RD, counter_buffer, input, sizeof(uint), 1);
 
 			counter_lastValue = (int) input[0];
 		}
@@ -280,6 +287,7 @@ public partial class ProceduralGeometry : Node3D {
 	}
 
 	public void computeDispose() {
+		uniformSet.Dispose();
 		computeHandler.Dispose();
 		RD.FreeRid(current_tex);
 		RD.FreeRid(counter_buffer);
