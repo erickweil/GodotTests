@@ -1,0 +1,59 @@
+[gd_scene load_steps=12 format=3 uid="uid://bfa1556411osw"]
+
+[ext_resource type="Script" path="res://LineDrawing/LineDrawing.cs" id="1_0kw5i"]
+[ext_resource type="Script" path="res://ProceduralGeometry/OrbitController.cs" id="2_micgb"]
+[ext_resource type="Shader" path="res://ProceduralGeometry/procedural_geometry.gdshader" id="3_3f4vp"]
+[ext_resource type="Texture2D" uid="uid://ud6ib363jivl" path="res://icon.svg" id="4_o20m4"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_anfc1"]
+sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+ground_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+
+[sub_resource type="Sky" id="Sky_uy1cp"]
+sky_material = SubResource("ProceduralSkyMaterial_anfc1")
+
+[sub_resource type="Environment" id="Environment_51126"]
+background_mode = 2
+sky = SubResource("Sky_uy1cp")
+tonemap_mode = 2
+glow_enabled = true
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_114wt"]
+render_priority = 0
+shader = ExtResource("3_3f4vp")
+
+[sub_resource type="SphereMesh" id="SphereMesh_ony0g"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_p0yxd"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hrkta"]
+albedo_texture = ExtResource("4_o20m4")
+
+[node name="Node3D" type="Node3D" node_paths=PackedStringArray("meshInstance")]
+script = ExtResource("1_0kw5i")
+meshInstance = NodePath("MeshInstance3D")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_51126")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="WorldEnvironment"]
+transform = Transform3D(-0.866023, -0.433016, 0.250001, 0.250002, 0.0580112, 0.966506, -0.433016, 0.899517, 0.0580157, 0, 0, 0)
+shadow_enabled = true
+directional_shadow_mode = 1
+
+[node name="CameraPivot" type="Node3D" parent="."]
+script = ExtResource("2_micgb")
+
+[node name="Camera3D" type="Camera3D" parent="CameraPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+cull_mask = 1048573
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("ShaderMaterial_114wt")
+mesh = SubResource("SphereMesh_ony0g")
+skeleton = NodePath("")
+
+[node name="Ground" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+mesh = SubResource("PlaneMesh_p0yxd")
+surface_material_override/0 = SubResource("StandardMaterial3D_hrkta")
